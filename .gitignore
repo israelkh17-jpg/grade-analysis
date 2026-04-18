@@ -1,0 +1,15 @@
+# 학생 개인정보 보호 - 실제 성적 데이터 파일 제외
+*.xlsx
+*.xls
+*.csv
+
+# HWP 원본 (PDF만 배포)
+*.hwp
+
+# 빈 파일
+성적분석_도구.html
+
+# 시스템 파일
+.DS_Store
+Thumbs.db
+.vscode/

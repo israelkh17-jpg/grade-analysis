@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2025학년도 1학기 중간고사 성적 분석 대시보드</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Pretendard','Apple SD Gothic Neo','Noto Sans KR',sans-serif; background:#f0f4f8; color:#1a202c; }
+.header { background:linear-gradient(135deg,#1e3a5f,#2d6a9f); color:#fff; padding:24px 32px; }
+.header h1 { font-size:22px; font-weight:700; }
+.header p { font-size:13px; opacity:0.8; margin-top:4px; }
+.container { max-width:1280px; margin:0 auto; padding:20px; }
+
+/* KPI Cards */
+.kpi-row { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; margin-bottom:24px; }
+.kpi-card { background:#fff; border-radius:12px; padding:18px; box-shadow:0 1px 4px rgba(0,0,0,0.06); text-align:center; }
+.kpi-card .label { font-size:12px; color:#718096; font-weight:500; margin-bottom:6px; }
+.kpi-card .value { font-size:28px; font-weight:700; color:#1e3a5f; }
+.kpi-card .sub { font-size:11px; color:#a0aec0; margin-top:2px; }
+
+/* Tabs */
+.tabs { display:flex; gap:6px; margin-bottom:20px; flex-wrap:wrap; }
+.tab-btn { padding:8px 18px; border:none; border-radius:8px; background:#e2e8f0; color:#4a5568; font-size:13px; font-weight:600; cursor:pointer; transition:all 0.2s; }
+.tab-btn.active { background:#1e3a5f; color:#fff; }
+.tab-btn:hover { background:#cbd5e0; }
+.tab-btn.active:hover { background:#2d5a8a; }
+
+/* Panels */
+.panel { display:none; }
+.panel.active { display:block; }
+
+/* Cards */
+.card { background:#fff; border-radius:12px; padding:20px; box-shadow:0 1px 4px rgba(0,0,0,0.06); margin-bottom:20px; }
+.card h3 { font-size:15px; font-weight:700; color:#1e3a5f; margin-bottom:14px; padding-bottom:8px; border-bottom:2px solid #e2e8f0; }
+
+/* Grid */
+.grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+@media(max-width:768px) { .grid-2 { grid-template-columns:1fr; } }
+
+/* Table */
+.table-wrap { overflow-x:auto; }
+table { width:100%; border-collapse:collapse; font-size:12px; }
+th { background:#f7fafc; padding:8px 10px; text-align:center; font-weight:600; color:#4a5568; border-bottom:2px solid #e2e8f0; position:sticky; top:0; }
+td { padding:7px 10px; text-align:center; border-bottom:1px solid #edf2f7; }
+tr:hover { background:#f7fafc; }
+
+/* Item analysis bar */
+.item-bar { display:flex; align-items:center; margin:3px 0; }
+.item-bar .q-label { width:42px; font-size:11px; font-weight:600; color:#4a5568; text-align:right; padding-right:8px; flex-shrink:0; }
+.item-bar .bar-bg { flex:1; height:22px; background:#edf2f7; border-radius:4px; position:relative; overflow:hidden; }
+.item-bar .bar-fill { height:100%; border-radius:4px; display:flex; align-items:center; justify-content:flex-end; padding-right:6px; font-size:10px; font-weight:600; color:#fff; transition:width 0.6s ease; }
+.item-bar .point-label { width:40px; font-size:10px; color:#a0aec0; text-align:left; padding-left:6px; flex-shrink:0; }
+
+/* Rate colors */
+.rate-high { background:linear-gradient(90deg,#38a169,#48bb78); }
+.rate-mid { background:linear-gradient(90deg,#d69e2e,#ecc94b); }
+.rate-low { background:linear-gradient(90deg,#e53e3e,#fc8181); }
+
+/* Filters */
+.filter-row { display:flex; gap:8px; margin-bottom:14px; align-items:center; flex-wrap:wrap; }
+.filter-row label { font-size:12px; font-weight:600; color:#4a5568; }
+.filter-row select { padding:5px 10px; border:1px solid #cbd5e0; border-radius:6px; font-size:12px; }
+.filter-row input { padding:5px 10px; border:1px solid #cbd5e0; border-radius:6px; font-size:12px; width:160px; }
+
+/* Chart container */
+.chart-container { position:relative; width:100%; }
+.chart-container canvas { width:100% !important; }
+
+/* Wrong dist tooltip style */
+.wrong-detail { font-size:11px; color:#718096; margin-top:4px; }
+.wrong-chip { display:inline-block; background:#fed7d7; color:#c53030; padding:1px 6px; border-radius:4px; margin:1px; font-size:10px; font-weight:600; }
+.correct-chip { display:inline-block; background:#c6f6d5; color:#276749; padding:1px 6px; border-radius:4px; margin:1px; font-size:10px; font-weight:600; }
+
+/* Scroll table */
+.scroll-table { max-height:500px; overflow-y:auto; }
+
+/* Box plot area */
+.boxplot-row { display:flex; align-items:center; margin:6px 0; }
+.boxplot-label { width:40px; font-size:12px; font-weight:600; text-align:right; padding-right:10px; color:#4a5568; }
+.boxplot-area { flex:1; height:28px; position:relative; }
+.boxplot-line { position:absolute; height:2px; background:#a0aec0; top:13px; }
+.boxplot-box { position:absolute; height:20px; top:4px; border-radius:4px; border:2px solid #2d6a9f; background:rgba(45,106,159,0.15); }
+.boxplot-median { position:absolute; width:3px; height:20px; top:4px; background:#e53e3e; border-radius:1px; }
+.boxplot-whisker { position:absolute; width:1px; height:12px; top:8px; background:#a0aec0; }
+.boxplot-cap { position:absolute; width:8px; height:2px; background:#a0aec0; top:13px; }
+
+.rank-badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:10px; font-weight:700; }
+.rank-1 { background:#fefcbf; color:#975a16; }
+.rank-2 { background:#e2e8f0; color:#4a5568; }
+.rank-3 { background:#feebc8; color:#9c4221; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>2025학년도 1학기 중간고사 성적 분석</h1>
+  <p>과학: 통합과학1(4) | 1학년 전체 (1반~9반) | 총 242명</p>
+</div>
+<div class="container">
+  <!-- KPI Cards -->
+  <div class="kpi-row" id="kpiRow"></div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="showTab('overview')">전체 개요</button>
+    <button class="tab-btn" onclick="showTab('classCompare')">반별 비교</button>
+    <button class="tab-btn" onclick="showTab('itemAnalysis')">문항 분석</button>
+    <button class="tab-btn" onclick="showTab('scoreDist')">점수 분포</button>
+    <button class="tab-btn" onclick="showTab('studentList')">학생 성적표</button>
+  </div>
+
+  <!-- Panel: Overview -->
+  <div class="panel active" id="panel-overview">
+    <div class="grid-2">
+      <div class="card">
+        <h3>점수 구간별 인원 분포</h3>
+        <div class="chart-container"><canvas id="chartOverviewDist" height="260"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>선택형 vs 서답형 평균 비교</h3>
+        <div class="chart-container"><canvas id="chartScoreType" height="260"></canvas></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>반별 평균 점수</h3>
+      <div class="chart-container"><canvas id="chartClassMean" height="220"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Panel: Class Compare -->
+  <div class="panel" id="panel-classCompare">
+    <div class="card">
+      <h3>반별 통계 요약</h3>
+      <div class="table-wrap">
+        <table id="classTable">
+          <thead><tr><th>반</th><th>인원</th><th>평균</th><th>중앙값</th><th>표준편차</th><th>최고점</th><th>최저점</th><th>Q1</th><th>Q3</th><th>선택형 평균</th><th>서답형 평균</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <h3>반별 점수 분포 (Box Plot 스타일)</h3>
+      <div id="boxplotArea"></div>
+    </div>
+    <div class="card">
+      <h3>반별 점수 구간 분포</h3>
+      <div class="chart-container"><canvas id="chartClassDist" height="280"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Panel: Item Analysis -->
+  <div class="panel" id="panel-itemAnalysis">
+    <div class="card">
+      <h3>문항별 정답률</h3>
+      <div id="itemBars"></div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <h3>문항별 정답률 차트</h3>
+        <div class="chart-container"><canvas id="chartItemRate" height="300"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>문항 상세 분석</h3>
+        <div class="filter-row">
+          <label>문항 선택:</label>
+          <select id="itemSelect" onchange="showItemDetail()"></select>
+        </div>
+        <div id="itemDetailArea"></div>
+        <div class="chart-container" style="margin-top:12px"><canvas id="chartItemWrong" height="200"></canvas></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>반별 문항 정답률 히트맵</h3>
+      <div class="table-wrap scroll-table" id="heatmapArea"></div>
+    </div>
+  </div>
+
+  <!-- Panel: Score Distribution -->
+  <div class="panel" id="panel-scoreDist">
+    <div class="filter-row">
+      <label>반 선택:</label>
+      <select id="distClassFilter" onchange="updateDistChart()">
+        <option value="all">전체</option>
+      </select>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <h3>점수 분포 히스토그램</h3>
+        <div class="chart-container"><canvas id="chartDistHist" height="280"></canvas></div>
+      </div>
+      <div class="card">
+        <h3>누적 분포</h3>
+        <div class="chart-container"><canvas id="chartDistCum" height="280"></canvas></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>성적 구간별 비율</h3>
+      <div class="chart-container"><canvas id="chartDistPie" height="260"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Panel: Student List -->
+  <div class="panel" id="panel-studentList">
+    <div class="filter-row">
+      <label>반:</label>
+      <select id="studentClassFilter" onchange="filterStudents()">
+        <option value="all">전체</option>
+      </select>
+      <label style="margin-left:12px">검색:</label>
+      <input type="text" id="studentSearch" placeholder="이름 검색..." oninput="filterStudents()">
+    </div>
+    <div class="card">
+      <div class="table-wrap scroll-table">
+        <table>
+          <thead><tr><th>석차</th><th>반</th><th>이름</th><th>선택형</th><th>서답형</th><th>총점</th></tr></thead>
+          <tbody id="studentTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const DATA = {"overview": {"total_students": 242, "mean": 65.9, "median": 69.6, "std": 24.6, "max": 100.0, "min": 9.9, "total_questions": 26, "perfect_score": 100}, "class_stats": [{"class": 1, "n": 28, "mean": 70.1, "median": 73.6, "std": 21.5, "max": 100.0, "min": 32.8, "select_mean": 57.7, "essay_mean": 12.5, "q1": 47.8, "q3": 90.0}, {"class": 2, "n": 28, "mean": 66.9, "median": 70.8, "std": 23.7, "max": 100.0, "min": 17.7, "select_mean": 54.7, "essay_mean": 12.2, "q1": 44.6, "q3": 84.2}, {"class": 3, "n": 26, "mean": 67.8, "median": 71.6, "std": 23.4, "max": 96.7, "min": 9.9, "select_mean": 56.2, "essay_mean": 11.7, "q1": 53.9, "q3": 88.2}, {"class": 4, "n": 27, "mean": 62.3, "median": 72.8, "std": 28.6, "max": 96.7, "min": 13.7, "select_mean": 50.9, "essay_mean": 11.4, "q1": 29.2, "q3": 89.0}, {"class": 5, "n": 26, "mean": 68.0, "median": 72.8, "std": 23.6, "max": 100.0, "min": 13.5, "select_mean": 56.7, "essay_mean": 11.3, "q1": 53.8, "q3": 86.0}, {"class": 6, "n": 27, "mean": 64.9, "median": 67.1, "std": 24.1, "max": 100.0, "min": 20.2, "select_mean": 53.3, "essay_mean": 11.6, "q1": 50.0, "q3": 87.3}, {"class": 7, "n": 27, "mean": 66.0, "median": 69.8, "std": 24.6, "max": 98.0, "min": 21.3, "select_mean": 54.1, "essay_mean": 11.9, "q1": 45.4, "q3": 88.0}, {"class": 8, "n": 27, "mean": 66.6, "median": 69.9, "std": 23.3, "max": 96.7, "min": 16.9, "select_mean": 55.5, "essay_mean": 11.1, "q1": 49.2, "q3": 87.2}, {"class": 9, "n": 26, "mean": 60.5, "median": 64.3, "std": 26.5, "max": 93.8, "min": 14.6, "select_mean": 50.6, "essay_mean": 10.0, "q1": 34.2, "q3": 83.0}], "score_dist": {"labels": ["0-9", "10-19", "20-29", "30-39", "40-49", "50-59", "60-69", "70-79", "80-89", "90-100"], "all": [1, 9, 18, 18, 24, 21, 33, 21, 47, 50], "class_1": [0, 0, 0, 2, 6, 1, 4, 2, 5, 8], "class_2": [0, 1, 2, 2, 3, 1, 4, 4, 7, 4], "class_3": [1, 0, 1, 2, 0, 6, 3, 3, 5, 5], "class_4": [0, 3, 5, 0, 3, 1, 1, 1, 6, 7], "class_5": [0, 1, 1, 3, 1, 2, 5, 3, 5, 5], "class_6": [0, 0, 3, 2, 2, 4, 6, 1, 3, 6], "class_7": [0, 0, 3, 2, 4, 3, 2, 1, 7, 5], "class_8": [0, 1, 2, 1, 4, 1, 5, 3, 4, 6], "class_9": [0, 3, 1, 4, 1, 2, 3, 3, 5, 4]}, "item_analysis": [{"q": 1, "answer": 5, "point": 3.1, "correct_rate": 79.8, "wrong_dist": {"4": 42, "3": 5, "2": 1, "1": 1}, "class_rates": {"1": 96.4, "2": 82.1, "3": 84.6, "4": 63.0, "5": 80.8, "6": 74.1, "7": 74.1, "8": 81.5, "9": 80.8}}, {"q": 2, "answer": 1, "point": 3.3, "correct_rate": 39.3, "wrong_dist": {"3": 134, "5": 7, "4": 4, "2": 2}, "class_rates": {"1": 46.4, "2": 46.4, "3": 34.6, "4": 29.6, "5": 42.3, "6": 25.9, "7": 48.1, "8": 48.1, "9": 30.8}}, {"q": 3, "answer": 2, "point": 3.2, "correct_rate": 99.6, "wrong_dist": {"3": 1}, "class_rates": {"1": 100.0, "2": 100.0, "3": 100.0, "4": 96.3, "5": 100.0, "6": 100.0, "7": 100.0, "8": 100.0, "9": 100.0}}, {"q": 4, "answer": 4, "point": 3.5, "correct_rate": 80.6, "wrong_dist": {"2": 11, "1": 18, "5": 13, "3": 5}, "class_rates": {"1": 85.7, "2": 82.1, "3": 100.0, "4": 77.8, "5": 84.6, "6": 81.5, "7": 81.5, "8": 66.7, "9": 65.4}}, {"q": 5, "answer": 3, "point": 3.5, "correct_rate": 84.7, "wrong_dist": {"5": 16, "1": 13, "4": 5, "2": 3}, "class_rates": {"1": 89.3, "2": 82.1, "3": 76.9, "4": 77.8, "5": 84.6, "6": 92.6, "7": 81.5, "8": 88.9, "9": 88.5}}, {"q": 6, "answer": 5, "point": 3.4, "correct_rate": 64.9, "wrong_dist": {"3": 56, "1": 7, "4": 19, "2": 2}, "class_rates": {"1": 57.1, "2": 50.0, "3": 61.5, "4": 55.6, "5": 65.4, "6": 74.1, "7": 81.5, "8": 77.8, "9": 61.5}}, {"q": 7, "answer": 1, "point": 3.2, "correct_rate": 60.7, "wrong_dist": {"5": 13, "3": 42, "2": 13, "4": 26}, "class_rates": {"1": 71.4, "2": 50.0, "3": 65.4, "4": 55.6, "5": 69.2, "6": 59.3, "7": 63.0, "8": 59.3, "9": 53.8}}, {"q": 8, "answer": 3, "point": 3.5, "correct_rate": 70.7, "wrong_dist": {"1": 26, "4": 20, "5": 22, "2": 3}, "class_rates": {"1": 78.6, "2": 75.0, "3": 65.4, "4": 63.0, "5": 73.1, "6": 66.7, "7": 74.1, "8": 70.4, "9": 69.2}}, {"q": 9, "answer": 5, "point": 3.1, "correct_rate": 57.9, "wrong_dist": {"4": 61, "2": 16, "3": 21, "1": 4}, "class_rates": {"1": 53.6, "2": 53.6, "3": 50.0, "4": 63.0, "5": 73.1, "6": 48.1, "7": 55.6, "8": 66.7, "9": 57.7}}, {"q": 10, "answer": 2, "point": 3.4, "correct_rate": 65.3, "wrong_dist": {"1": 26, "3": 22, "4": 24, "5": 10}, "class_rates": {"1": 71.4, "2": 64.3, "3": 80.8, "4": 63.0, "5": 65.4, "6": 66.7, "7": 63.0, "8": 59.3, "9": 53.8}}, {"q": 11, "answer": 4, "point": 3.3, "correct_rate": 72.7, "wrong_dist": {"3": 31, "2": 7, "1": 3, "5": 25}, "class_rates": {"1": 82.1, "2": 78.6, "3": 76.9, "4": 77.8, "5": 73.1, "6": 70.4, "7": 66.7, "8": 74.1, "9": 53.8}}, {"q": 12, "answer": 1, "point": 3.5, "correct_rate": 52.9, "wrong_dist": {"4": 45, "3": 40, "2": 21, "5": 6}, "class_rates": {"1": 67.9, "2": 57.1, "3": 65.4, "4": 51.9, "5": 46.2, "6": 44.4, "7": 48.1, "8": 44.4, "9": 50.0}}, {"q": 13, "answer": 1, "point": 3.1, "correct_rate": 75.6, "wrong_dist": {"4": 20, "5": 14, "2": 20, "3": 5}, "class_rates": {"1": 71.4, "2": 78.6, "3": 80.8, "4": 63.0, "5": 88.5, "6": 77.8, "7": 74.1, "8": 77.8, "9": 69.2}}, {"q": 14, "answer": 2, "point": 3.3, "correct_rate": 61.2, "wrong_dist": {"4": 47, "3": 27, "5": 10, "1": 8, "G": 1}, "class_rates": {"1": 60.7, "2": 64.3, "3": 57.7, "4": 63.0, "5": 69.2, "6": 66.7, "7": 63.0, "8": 63.0, "9": 42.3}}, {"q": 15, "answer": 5, "point": 3.2, "correct_rate": 75.6, "wrong_dist": {"3": 20, "4": 24, "2": 10, "1": 5}, "class_rates": {"1": 85.7, "2": 71.4, "3": 76.9, "4": 74.1, "5": 76.9, "6": 74.1, "7": 66.7, "8": 77.8, "9": 76.9}}, {"q": 16, "answer": 2, "point": 3.5, "correct_rate": 53.7, "wrong_dist": {"4": 61, "5": 11, "3": 30, "1": 10}, "class_rates": {"1": 53.6, "2": 60.7, "3": 57.7, "4": 55.6, "5": 50.0, "6": 51.9, "7": 48.1, "8": 59.3, "9": 46.2}}, {"q": 17, "answer": 4, "point": 3.4, "correct_rate": 73.1, "wrong_dist": {"3": 24, "5": 33, "2": 4, "1": 4}, "class_rates": {"1": 75.0, "2": 78.6, "3": 69.2, "4": 70.4, "5": 84.6, "6": 70.4, "7": 63.0, "8": 74.1, "9": 73.1}}, {"q": 18, "answer": 3, "point": 3.5, "correct_rate": 67.8, "wrong_dist": {"5": 36, "1": 17, "4": 22, "2": 3}, "class_rates": {"1": 67.9, "2": 57.1, "3": 69.2, "4": 51.9, "5": 61.5, "6": 70.4, "7": 70.4, "8": 81.5, "9": 80.8}}, {"q": 19, "answer": 5, "point": 3.5, "correct_rate": 80.6, "wrong_dist": {"4": 18, "3": 18, "2": 7, "1": 4}, "class_rates": {"1": 89.3, "2": 85.7, "3": 80.8, "4": 74.1, "5": 80.8, "6": 74.1, "7": 92.6, "8": 85.2, "9": 61.5}}, {"q": 20, "answer": 4, "point": 3.5, "correct_rate": 41.7, "wrong_dist": {"5": 118, "2": 6, "3": 15, "1": 2}, "class_rates": {"1": 39.3, "2": 46.4, "3": 34.6, "4": 40.7, "5": 53.8, "6": 44.4, "7": 40.7, "8": 37.0, "9": 38.5}}, {"q": 21, "answer": 1, "point": 0.0, "correct_rate": 35.5, "wrong_dist": {"3": 104, "2": 8, "4": 26, "5": 16}, "class_rates": {"1": 28.6, "2": 35.7, "3": 38.5, "4": 22.2, "5": 30.8, "6": 40.7, "7": 44.4, "8": 37.0, "9": 42.3}}, {"q": 22, "answer": 4, "point": 3.3, "correct_rate": 52.5, "wrong_dist": {"5": 45, "1": 11, "2": 34, "3": 22}, "class_rates": {"1": 46.4, "2": 50.0, "3": 69.2, "4": 40.7, "5": 61.5, "6": 59.3, "7": 55.6, "8": 44.4, "9": 46.2}}, {"q": 23, "answer": 3, "point": 3.2, "correct_rate": 83.9, "wrong_dist": {"4": 13, "1": 2, "2": 13, "I": 1, "5": 8}, "class_rates": {"1": 85.7, "2": 75.0, "3": 88.5, "4": 88.9, "5": 88.5, "6": 77.8, "7": 77.8, "8": 88.9, "9": 84.6}}, {"q": 24, "answer": 2, "point": 3.1, "correct_rate": 58.7, "wrong_dist": {"4": 40, "3": 29, "1": 4, "5": 24}, "class_rates": {"1": 67.9, "2": 67.9, "3": 61.5, "4": 59.3, "5": 57.7, "6": 44.4, "7": 55.6, "8": 59.3, "9": 53.8}}, {"q": 25, "answer": 1, "point": 1.7, "correct_rate": 86.4, "wrong_dist": {"5": 4, "2": 16, "3": 8, "4": 2}, "class_rates": {"1": 92.9, "2": 89.3, "3": 84.6, "4": 74.1, "5": 84.6, "6": 92.6, "7": 85.2, "8": 88.9, "9": 84.6}}, {"q": 26, "answer": 4, "point": 1.7, "correct_rate": 75.6, "wrong_dist": {"5": 33, "2": 8, "3": 11, "1": 4}, "class_rates": {"1": 85.7, "2": 78.6, "3": 73.1, "4": 74.1, "5": 65.4, "6": 77.8, "7": 74.1, "8": 74.1, "9": 76.9}}], "grade_bands": [{"label": "90-100", "count": 50, "pct": 20.7}, {"label": "80-89", "count": 47, "pct": 19.4}, {"label": "70-79", "count": 21, "pct": 8.7}, {"label": "60-69", "count": 33, "pct": 13.6}, {"label": "50-59", "count": 21, "pct": 8.7}, {"label": "40-49", "count": 24, "pct": 9.9}, {"label": "30-39", "count": 18, "pct": 7.4}, {"label": "20-29", "count": 18, "pct": 7.4}, {"label": "10-19", "count": 9, "pct": 3.7}, {"label": "0-9", "count": 1, "pct": 0.4}], "score_types": {"select_mean": 54.4, "essay_mean": 11.5, "select_max": 80, "essay_max": 20}, "students": [{"rank": 1, "class": 1, "name": "장하준", "select": 80.0, "essay": 20.0, "total": 100.0}, {"rank": 2, "class": 2, "name": "이호준", "select": 80.0, "essay": 20.0, "total": 100.0}, {"rank": 3, "class": 2, "name": "조승준", "select": 80.0, "essay": 20.0, "total": 100.0}, {"rank": 4, "class": 5, "name": "신윤재", "select": 80.0, "essay": 20.0, "total": 100.0}, {"rank": 5, "class": 6, "name": "백예준", "select": 80.0, "essay": 20.0, "total": 100.0}, {"rank": 6, "class": 5, "name": "이한빈", "select": 80.0, "essay": 19.0, "total": 99.0}, {"rank": 7, "class": 7, "name": "정준성", "select": 80.0, "essay": 18.0, "total": 98.0}, {"rank": 8, "class": 6, "name": "이유겸", "select": 80.0, "essay": 17.0, "total": 97.0}, {"rank": 9, "class": 2, "name": "황은우", "select": 76.8, "essay": 20.0, "total": 96.8}, {"rank": 10, "class": 3, "name": "김준원", "select": 76.7, "essay": 20.0, "total": 96.7}, {"rank": 11, "class": 4, "name": "송진욱", "select": 76.7, "essay": 20.0, "total": 96.7}, {"rank": 12, "class": 6, "name": "김성하", "select": 76.7, "essay": 20.0, "total": 96.7}, {"rank": 13, "class": 7, "name": "이선재", "select": 76.7, "essay": 20.0, "total": 96.7}, {"rank": 14, "class": 8, "name": "강태영", "select": 76.7, "essay": 20.0, "total": 96.7}, {"rank": 15, "class": 1, "name": "김준모", "select": 76.5, "essay": 20.0, "total": 96.5}, {"rank": 16, "class": 7, "name": "정우진", "select": 76.5, "essay": 20.0, "total": 96.5}, {"rank": 17, "class": 7, "name": "강지석", "select": 76.5, "essay": 19.0, "total": 95.5}, {"rank": 18, "class": 5, "name": "채서윤", "select": 80.0, "essay": 15.0, "total": 95.0}, {"rank": 19, "class": 3, "name": "김은성", "select": 76.7, "essay": 18.0, "total": 94.7}, {"rank": 20, "class": 4, "name": "정희건", "select": 76.7, "essay": 18.0, "total": 94.7}, {"rank": 21, "class": 1, "name": "구성모", "select": 76.5, "essay": 18.0, "total": 94.5}, {"rank": 22, "class": 3, "name": "조윤우", "select": 76.5, "essay": 18.0, "total": 94.5}, {"rank": 23, "class": 8, "name": "천지훈", "select": 76.5, "essay": 18.0, "total": 94.5}, {"rank": 24, "class": 1, "name": "조현기", "select": 80.0, "essay": 14.0, "total": 94.0}, {"rank": 25, "class": 9, "name": "이건민", "select": 76.8, "essay": 17.0, "total": 93.8}, {"rank": 26, "class": 6, "name": "이호석", "select": 76.7, "essay": 17.0, "total": 93.7}, {"rank": 27, "class": 9, "name": "어지웅", "select": 76.6, "essay": 17.0, "total": 93.6}, {"rank": 28, "class": 1, "name": "이진규", "select": 73.4, "essay": 20.0, "total": 93.4}, {"rank": 29, "class": 5, "name": "신연호", "select": 73.4, "essay": 20.0, "total": 93.4}, {"rank": 30, "class": 3, "name": "이진욱", "select": 73.3, "essay": 20.0, "total": 93.3}, {"rank": 31, "class": 8, "name": "원영준", "select": 73.3, "essay": 20.0, "total": 93.3}, {"rank": 32, "class": 8, "name": "이승민", "select": 73.2, "essay": 20.0, "total": 93.2}, {"rank": 33, "class": 4, "name": "강관우", "select": 73.0, "essay": 20.0, "total": 93.0}, {"rank": 34, "class": 5, "name": "김승찬", "select": 73.0, "essay": 20.0, "total": 93.0}, {"rank": 35, "class": 1, "name": "유재민", "select": 73.4, "essay": 19.0, "total": 92.4}, {"rank": 36, "class": 3, "name": "송승주", "select": 73.4, "essay": 19.0, "total": 92.4}, {"rank": 37, "class": 6, "name": "유한재", "select": 73.4, "essay": 19.0, "total": 92.4}, {"rank": 38, "class": 2, "name": "황찬영", "select": 73.3, "essay": 19.0, "total": 92.3}, {"rank": 39, "class": 8, "name": "이도윤", "select": 73.2, "essay": 19.0, "total": 92.2}, {"rank": 40, "class": 9, "name": "심민혁", "select": 73.0, "essay": 19.0, "total": 92.0}, {"rank": 41, "class": 6, "name": "최주원", "select": 73.5, "essay": 18.0, "total": 91.5}, {"rank": 42, "class": 8, "name": "박세훈", "select": 73.4, "essay": 18.0, "total": 91.4}, {"rank": 43, "class": 4, "name": "양지원", "select": 73.3, "essay": 18.0, "total": 91.3}, {"rank": 44, "class": 4, "name": "김범준", "select": 73.0, "essay": 18.0, "total": 91.0}, {"rank": 45, "class": 7, "name": "오서형", "select": 73.6, "essay": 17.0, "total": 90.6}, {"rank": 46, "class": 9, "name": "서성빈", "select": 73.4, "essay": 17.0, "total": 90.4}, {"rank": 47, "class": 4, "name": "고석민", "select": 70.3, "essay": 20.0, "total": 90.3}, {"rank": 48, "class": 1, "name": "김태완", "select": 70.1, "essay": 20.0, "total": 90.1}, {"rank": 49, "class": 1, "name": "홍도윤", "select": 70.0, "essay": 20.0, "total": 90.0}, {"rank": 50, "class": 4, "name": "이인우", "select": 70.0, "essay": 20.0, "total": 90.0}, {"rank": 51, "class": 3, "name": "윤주환", "select": 69.9, "essay": 20.0, "total": 89.9}, {"rank": 52, "class": 2, "name": "장진혁", "select": 69.8, "essay": 20.0, "total": 89.8}, {"rank": 53, "class": 7, "name": "황보주현", "select": 69.7, "essay": 20.0, "total": 89.7}, {"rank": 54, "class": 8, "name": "최윤우", "select": 69.7, "essay": 20.0, "total": 89.7}, {"rank": 55, "class": 7, "name": "정재혁", "select": 76.5, "essay": 13.0, "total": 89.5}, {"rank": 56, "class": 9, "name": "강지민", "select": 73.2, "essay": 16.0, "total": 89.2}, {"rank": 57, "class": 1, "name": "현승찬", "select": 69.8, "essay": 19.0, "total": 88.8}, {"rank": 58, "class": 3, "name": "김민기", "select": 71.7, "essay": 17.0, "total": 88.7}, {"rank": 59, "class": 2, "name": "송유빈", "select": 73.1, "essay": 15.0, "total": 88.1}, {"rank": 60, "class": 4, "name": "전서준", "select": 70.1, "essay": 18.0, "total": 88.1}, {"rank": 61, "class": 9, "name": "유제석", "select": 70.1, "essay": 18.0, "total": 88.1}, {"rank": 62, "class": 1, "name": "이승찬", "select": 69.9, "essay": 18.0, "total": 87.9}, {"rank": 63, "class": 6, "name": "이동건", "select": 69.7, "essay": 18.0, "total": 87.7}, {"rank": 64, "class": 6, "name": "김건우", "select": 66.9, "essay": 20.0, "total": 86.9}, {"rank": 65, "class": 2, "name": "전가건", "select": 69.7, "essay": 17.0, "total": 86.7}, {"rank": 66, "class": 3, "name": "문지성", "select": 66.5, "essay": 20.0, "total": 86.5}, {"rank": 67, "class": 4, "name": "서정윤", "select": 66.5, "essay": 20.0, "total": 86.5}, {"rank": 68, "class": 7, "name": "최선우", "select": 68.4, "essay": 18.0, "total": 86.4}, {"rank": 69, "class": 5, "name": "고준호", "select": 73.2, "essay": 13.0, "total": 86.2}, {"rank": 70, "class": 7, "name": "이지한", "select": 66.2, "essay": 20.0, "total": 86.2}, {"rank": 71, "class": 5, "name": "조민기", "select": 66.0, "essay": 20.0, "total": 86.0}, {"rank": 72, "class": 5, "name": "김민준", "select": 66.9, "essay": 19.0, "total": 85.9}, {"rank": 73, "class": 6, "name": "이정명", "select": 69.9, "essay": 15.0, "total": 84.9}, {"rank": 74, "class": 4, "name": "민동휘", "select": 69.7, "essay": 15.0, "total": 84.7}, {"rank": 75, "class": 8, "name": "이재민", "select": 66.6, "essay": 18.0, "total": 84.6}, {"rank": 76, "class": 8, "name": "안건하", "select": 69.5, "essay": 15.0, "total": 84.5}, {"rank": 77, "class": 4, "name": "어승원", "select": 66.4, "essay": 18.0, "total": 84.4}, {"rank": 78, "class": 3, "name": "정현우", "select": 69.7, "essay": 14.0, "total": 83.7}, {"rank": 79, "class": 1, "name": "송민호", "select": 69.6, "essay": 14.0, "total": 83.6}, {"rank": 80, "class": 9, "name": "오준서", "select": 66.5, "essay": 17.0, "total": 83.5}, {"rank": 81, "class": 3, "name": "박동후", "select": 66.4, "essay": 17.0, "total": 83.4}, {"rank": 82, "class": 2, "name": "백승원", "select": 63.3, "essay": 20.0, "total": 83.3}, {"rank": 83, "class": 1, "name": "박지완", "select": 64.0, "essay": 19.0, "total": 83.0}, {"rank": 84, "class": 8, "name": "안현준", "select": 66.6, "essay": 16.0, "total": 82.6}, {"rank": 85, "class": 1, "name": "김승후", "select": 66.4, "essay": 16.0, "total": 82.4}, {"rank": 86, "class": 7, "name": "이동현", "select": 63.2, "essay": 19.0, "total": 82.2}, {"rank": 87, "class": 7, "name": "심우혁", "select": 70.1, "essay": 12.0, "total": 82.1}, {"rank": 88, "class": 2, "name": "김하언", "select": 70.0, "essay": 12.0, "total": 82.0}, {"rank": 89, "class": 4, "name": "이승민", "select": 66.8, "essay": 15.0, "total": 81.8}, {"rank": 90, "class": 9, "name": "오섬근", "select": 69.7, "essay": 12.0, "total": 81.7}, {"rank": 91, "class": 7, "name": "임하율", "select": 63.4, "essay": 18.0, "total": 81.4}, {"rank": 92, "class": 2, "name": "김민준", "select": 63.0, "essay": 18.0, "total": 81.0}, {"rank": 93, "class": 4, "name": "정새한", "select": 63.0, "essay": 18.0, "total": 81.0}, {"rank": 94, "class": 9, "name": "김정훈", "select": 70.0, "essay": 11.0, "total": 81.0}, {"rank": 95, "class": 5, "name": "양제이", "select": 63.4, "essay": 17.0, "total": 80.4}, {"rank": 96, "class": 5, "name": "한주현", "select": 63.3, "essay": 17.0, "total": 80.3}, {"rank": 97, "class": 2, "name": "정기훈", "select": 60.2, "essay": 20.0, "total": 80.2}, {"rank": 98, "class": 3, "name": "김세찬", "select": 61.8, "essay": 18.0, "total": 79.8}, {"rank": 99, "class": 3, "name": "전형진", "select": 62.7, "essay": 17.0, "total": 79.7}, {"rank": 100, "class": 5, "name": "박태선", "select": 69.7, "essay": 10.0, "total": 79.7}, {"rank": 101, "class": 2, "name": "허원준", "select": 63.3, "essay": 16.0, "total": 79.3}, {"rank": 102, "class": 7, "name": "윤건", "select": 63.3, "essay": 16.0, "total": 79.3}, {"rank": 103, "class": 9, "name": "박성민", "select": 66.6, "essay": 12.0, "total": 78.6}, {"rank": 104, "class": 6, "name": "JIN XINGYU", "select": 63.1, "essay": 15.0, "total": 78.1}, {"rank": 105, "class": 5, "name": "김재욱", "select": 66.4, "essay": 11.0, "total": 77.4}, {"rank": 106, "class": 8, "name": "최지웅", "select": 63.1, "essay": 14.0, "total": 77.1}, {"rank": 107, "class": 5, "name": "엄지후", "select": 66.3, "essay": 10.0, "total": 76.3}, {"rank": 108, "class": 8, "name": "채지민", "select": 63.1, "essay": 13.0, "total": 76.1}, {"rank": 109, "class": 9, "name": "장준서", "select": 66.5, "essay": 9.0, "total": 75.5}, {"rank": 110, "class": 2, "name": "김민제", "select": 59.9, "essay": 15.0, "total": 74.9}, {"rank": 111, "class": 3, "name": "문준혁", "select": 66.5, "essay": 8.0, "total": 74.5}, {"rank": 112, "class": 1, "name": "황인원", "select": 59.9, "essay": 14.0, "total": 73.9}, {"rank": 113, "class": 8, "name": "최진원", "select": 73.5, "essay": 0.0, "total": 73.5}, {"rank": 114, "class": 1, "name": "조민재", "select": 66.4, "essay": 7.0, "total": 73.4}, {"rank": 115, "class": 4, "name": "김태준", "select": 56.8, "essay": 16.0, "total": 72.8}, {"rank": 116, "class": 2, "name": "유동호", "select": 56.9, "essay": 14.0, "total": 70.9}, {"rank": 117, "class": 2, "name": "조은호", "select": 56.6, "essay": 14.0, "total": 70.6}, {"rank": 118, "class": 9, "name": "송성민", "select": 53.5, "essay": 17.0, "total": 70.5}, {"rank": 119, "class": 8, "name": "임하준", "select": 62.9, "essay": 7.0, "total": 69.9}, {"rank": 120, "class": 7, "name": "이동건", "select": 56.8, "essay": 13.0, "total": 69.8}, {"rank": 121, "class": 6, "name": "이유건", "select": 59.7, "essay": 10.0, "total": 69.7}, {"rank": 122, "class": 2, "name": "윤지훈", "select": 55.4, "essay": 14.0, "total": 69.4}, {"rank": 123, "class": 5, "name": "장현준", "select": 51.2, "essay": 18.0, "total": 69.2}, {"rank": 124, "class": 2, "name": "윤준빈", "select": 49.9, "essay": 19.0, "total": 68.9}, {"rank": 125, "class": 3, "name": "최준혁", "select": 56.6, "essay": 12.0, "total": 68.6}, {"rank": 126, "class": 6, "name": "장석준", "select": 53.5, "essay": 15.0, "total": 68.5}, {"rank": 127, "class": 5, "name": "김서준", "select": 59.4, "essay": 9.0, "total": 68.4}, {"rank": 128, "class": 6, "name": "윤진영", "select": 53.6, "essay": 14.0, "total": 67.6}, {"rank": 129, "class": 5, "name": "임승혁", "select": 56.1, "essay": 11.0, "total": 67.1}, {"rank": 130, "class": 6, "name": "신원준", "select": 63.1, "essay": 4.0, "total": 67.1}, {"rank": 131, "class": 8, "name": "황현민", "select": 54.1, "essay": 13.0, "total": 67.1}, {"rank": 132, "class": 2, "name": "이희성", "select": 59.7, "essay": 7.0, "total": 66.7}, {"rank": 133, "class": 1, "name": "김태양", "select": 51.0, "essay": 15.0, "total": 66.0}, {"rank": 134, "class": 5, "name": "최서우", "select": 60.0, "essay": 6.0, "total": 66.0}, {"rank": 135, "class": 1, "name": "이준희", "select": 63.7, "essay": 2.0, "total": 65.7}, {"rank": 136, "class": 3, "name": "안도현", "select": 58.6, "essay": 7.0, "total": 65.6}, {"rank": 137, "class": 9, "name": "정승우", "select": 58.6, "essay": 7.0, "total": 65.6}, {"rank": 138, "class": 2, "name": "김승원", "select": 52.8, "essay": 11.0, "total": 63.8}, {"rank": 139, "class": 7, "name": "임태규", "select": 52.8, "essay": 11.0, "total": 63.8}, {"rank": 140, "class": 8, "name": "정연두", "select": 54.3, "essay": 9.0, "total": 63.3}, {"rank": 141, "class": 9, "name": "임승현", "select": 53.0, "essay": 10.0, "total": 63.0}, {"rank": 142, "class": 6, "name": "김지환", "select": 53.1, "essay": 9.0, "total": 62.1}, {"rank": 143, "class": 8, "name": "서완", "select": 53.5, "essay": 8.0, "total": 61.5}, {"rank": 144, "class": 4, "name": "김래언", "select": 52.4, "essay": 9.0, "total": 61.4}, {"rank": 145, "class": 5, "name": "공태윤", "select": 53.2, "essay": 8.0, "total": 61.2}, {"rank": 146, "class": 1, "name": "신정우", "select": 50.1, "essay": 11.0, "total": 61.1}, {"rank": 147, "class": 9, "name": "위태현", "select": 50.1, "essay": 11.0, "total": 61.1}, {"rank": 148, "class": 3, "name": "이시온", "select": 59.0, "essay": 2.0, "total": 61.0}, {"rank": 149, "class": 6, "name": "이주왕", "select": 49.9, "essay": 11.0, "total": 60.9}, {"rank": 150, "class": 1, "name": "임지산", "select": 53.4, "essay": 7.0, "total": 60.4}, {"rank": 151, "class": 8, "name": "박준호", "select": 48.0, "essay": 12.0, "total": 60.0}, {"rank": 152, "class": 7, "name": "김민준", "select": 49.9, "essay": 10.0, "total": 59.9}, {"rank": 153, "class": 9, "name": "강예준", "select": 49.9, "essay": 10.0, "total": 59.9}, {"rank": 154, "class": 5, "name": "신예준", "select": 51.6, "essay": 8.0, "total": 59.6}, {"rank": 155, "class": 3, "name": "강민성", "select": 50.2, "essay": 9.0, "total": 59.2}, {"rank": 156, "class": 2, "name": "신윤성", "select": 50.2, "essay": 8.0, "total": 58.2}, {"rank": 157, "class": 8, "name": "이지후", "select": 43.5, "essay": 14.0, "total": 57.5}, {"rank": 158, "class": 4, "name": "신건호", "select": 46.4, "essay": 11.0, "total": 57.4}, {"rank": 159, "class": 6, "name": "김준범", "select": 43.3, "essay": 14.0, "total": 57.3}, {"rank": 160, "class": 6, "name": "양완석", "select": 50.1, "essay": 7.0, "total": 57.1}, {"rank": 161, "class": 3, "name": "최연후", "select": 46.8, "essay": 10.0, "total": 56.8}, {"rank": 162, "class": 1, "name": "윤선우", "select": 46.7, "essay": 10.0, "total": 56.7}, {"rank": 163, "class": 7, "name": "김준서", "select": 46.5, "essay": 8.0, "total": 54.5}, {"rank": 164, "class": 6, "name": "장정환", "select": 43.2, "essay": 11.0, "total": 54.2}, {"rank": 165, "class": 3, "name": "박준서", "select": 47.1, "essay": 7.0, "total": 54.1}, {"rank": 166, "class": 3, "name": "박준용", "select": 46.8, "essay": 7.0, "total": 53.8}, {"rank": 167, "class": 7, "name": "김태우", "select": 48.3, "essay": 5.0, "total": 53.3}, {"rank": 168, "class": 9, "name": "이승규", "select": 41.2, "essay": 11.0, "total": 52.2}, {"rank": 169, "class": 3, "name": "이준서", "select": 42.9, "essay": 9.0, "total": 51.9}, {"rank": 170, "class": 6, "name": "고훈", "select": 41.9, "essay": 10.0, "total": 51.9}, {"rank": 171, "class": 5, "name": "방지오", "select": 44.8, "essay": 7.0, "total": 51.8}, {"rank": 172, "class": 3, "name": "임재원", "select": 46.6, "essay": 5.0, "total": 51.6}, {"rank": 173, "class": 8, "name": "박인서", "select": 40.5, "essay": 9.0, "total": 49.5}, {"rank": 174, "class": 4, "name": "이현준", "select": 43.4, "essay": 6.0, "total": 49.4}, {"rank": 175, "class": 4, "name": "박지후", "select": 42.1, "essay": 7.0, "total": 49.1}, {"rank": 176, "class": 7, "name": "한규영", "select": 39.9, "essay": 9.0, "total": 48.9}, {"rank": 177, "class": 8, "name": "구동혁", "select": 43.8, "essay": 5.0, "total": 48.8}, {"rank": 178, "class": 1, "name": "이지오", "select": 43.7, "essay": 5.0, "total": 48.7}, {"rank": 179, "class": 9, "name": "송준석", "select": 43.5, "essay": 5.0, "total": 48.5}, {"rank": 180, "class": 4, "name": "이종훈", "select": 41.4, "essay": 7.0, "total": 48.4}, {"rank": 181, "class": 6, "name": "최성현", "select": 37.1, "essay": 11.0, "total": 48.1}, {"rank": 182, "class": 7, "name": "최연우", "select": 38.7, "essay": 8.0, "total": 46.7}, {"rank": 183, "class": 1, "name": "유승언", "select": 38.0, "essay": 7.0, "total": 45.0}, {"rank": 184, "class": 2, "name": "이승우", "select": 42.0, "essay": 3.0, "total": 45.0}, {"rank": 185, "class": 7, "name": "오인호", "select": 33.2, "essay": 11.0, "total": 44.2}, {"rank": 186, "class": 5, "name": "김승우", "select": 36.8, "essay": 7.0, "total": 43.8}, {"rank": 187, "class": 2, "name": "박민선", "select": 38.4, "essay": 5.0, "total": 43.4}, {"rank": 188, "class": 8, "name": "김주환", "select": 37.1, "essay": 6.0, "total": 43.1}, {"rank": 189, "class": 1, "name": "송주빈", "select": 39.7, "essay": 3.0, "total": 42.7}, {"rank": 190, "class": 2, "name": "강현규", "select": 37.7, "essay": 5.0, "total": 42.7}, {"rank": 191, "class": 1, "name": "허윤", "select": 36.9, "essay": 5.0, "total": 41.9}, {"rank": 192, "class": 7, "name": "김세민", "select": 40.5, "essay": 1.0, "total": 41.5}, {"rank": 193, "class": 1, "name": "김정우", "select": 33.2, "essay": 8.0, "total": 41.2}, {"rank": 194, "class": 6, "name": "심우용", "select": 38.2, "essay": 3.0, "total": 41.2}, {"rank": 195, "class": 8, "name": "황남준", "select": 39.2, "essay": 2.0, "total": 41.2}, {"rank": 196, "class": 1, "name": "김도령", "select": 31.0, "essay": 10.0, "total": 41.0}, {"rank": 197, "class": 7, "name": "이민재", "select": 35.3, "essay": 4.0, "total": 39.3}, {"rank": 198, "class": 5, "name": "한승우", "select": 36.9, "essay": 2.0, "total": 38.9}, {"rank": 199, "class": 5, "name": "조현우", "select": 34.7, "essay": 4.0, "total": 38.7}, {"rank": 200, "class": 6, "name": "박동윤", "select": 31.6, "essay": 7.0, "total": 38.6}, {"rank": 201, "class": 9, "name": "양우성", "select": 36.2, "essay": 2.0, "total": 38.2}, {"rank": 202, "class": 1, "name": "최호성", "select": 31.8, "essay": 5.0, "total": 36.8}, {"rank": 203, "class": 8, "name": "양예준", "select": 34.8, "essay": 2.0, "total": 36.8}, {"rank": 204, "class": 5, "name": "이승준", "select": 34.6, "essay": 2.0, "total": 36.6}, {"rank": 205, "class": 3, "name": "이기범", "select": 31.2, "essay": 4.0, "total": 35.2}, {"rank": 206, "class": 2, "name": "문성주", "select": 31.3, "essay": 3.0, "total": 34.3}, {"rank": 207, "class": 6, "name": "박지원", "select": 31.7, "essay": 2.0, "total": 33.7}, {"rank": 208, "class": 2, "name": "김민찬", "select": 28.5, "essay": 5.0, "total": 33.5}, {"rank": 209, "class": 9, "name": "배지훈", "select": 28.9, "essay": 4.0, "total": 32.9}, {"rank": 210, "class": 1, "name": "김도원", "select": 29.8, "essay": 3.0, "total": 32.8}, {"rank": 211, "class": 9, "name": "박사무엘", "select": 25.0, "essay": 7.0, "total": 32.0}, {"rank": 212, "class": 9, "name": "최원석", "select": 26.1, "essay": 5.0, "total": 31.1}, {"rank": 213, "class": 3, "name": "박민규", "select": 26.0, "essay": 5.0, "total": 31.0}, {"rank": 214, "class": 7, "name": "이호진", "select": 29.0, "essay": 2.0, "total": 31.0}, {"rank": 215, "class": 4, "name": "전민우", "select": 23.4, "essay": 6.0, "total": 29.4}, {"rank": 216, "class": 8, "name": "박상후", "select": 27.1, "essay": 2.0, "total": 29.1}, {"rank": 217, "class": 4, "name": "이우형", "select": 28.9, "essay": 0.0, "total": 28.9}, {"rank": 218, "class": 7, "name": "김도윤", "select": 26.9, "essay": 2.0, "total": 28.9}, {"rank": 219, "class": 4, "name": "박준영", "select": 26.7, "essay": 2.0, "total": 28.7}, {"rank": 220, "class": 4, "name": "김지한", "select": 28.1, "essay": 0.0, "total": 28.1}, {"rank": 221, "class": 2, "name": "김현우", "select": 26.9, "essay": 0.0, "total": 26.9}, {"rank": 222, "class": 3, "name": "김서후", "select": 26.7, "essay": 0.0, "total": 26.7}, {"rank": 223, "class": 2, "name": "최정훈", "select": 24.2, "essay": 2.0, "total": 26.2}, {"rank": 224, "class": 6, "name": "이고진", "select": 22.0, "essay": 4.0, "total": 26.0}, {"rank": 225, "class": 7, "name": "이우찬", "select": 18.3, "essay": 7.0, "total": 25.3}, {"rank": 226, "class": 9, "name": "조준", "select": 21.9, "essay": 3.0, "total": 24.9}, {"rank": 227, "class": 4, "name": "조민규", "select": 18.1, "essay": 6.0, "total": 24.1}, {"rank": 228, "class": 8, "name": "천서훈", "select": 23.4, "essay": 0.0, "total": 23.4}, {"rank": 229, "class": 7, "name": "문준호", "select": 21.3, "essay": 0.0, "total": 21.3}, {"rank": 230, "class": 6, "name": "탁준희", "select": 18.3, "essay": 2.0, "total": 20.3}, {"rank": 231, "class": 5, "name": "윤대성", "select": 20.2, "essay": 0.0, "total": 20.2}, {"rank": 232, "class": 6, "name": "안지민", "select": 20.2, "essay": 0.0, "total": 20.2}, {"rank": 233, "class": 4, "name": "문준희", "select": 19.9, "essay": 0.0, "total": 19.9}, {"rank": 234, "class": 4, "name": "신승원", "select": 17.9, "essay": 0.0, "total": 17.9}, {"rank": 235, "class": 2, "name": "오현근", "select": 17.7, "essay": 0.0, "total": 17.7}, {"rank": 236, "class": 8, "name": "백승준", "select": 16.9, "essay": 0.0, "total": 16.9}, {"rank": 237, "class": 9, "name": "이민준", "select": 16.5, "essay": 0.0, "total": 16.5}, {"rank": 238, "class": 9, "name": "이주열", "select": 13.3, "essay": 2.0, "total": 15.3}, {"rank": 239, "class": 9, "name": "강지원", "select": 14.6, "essay": 0.0, "total": 14.6}, {"rank": 240, "class": 4, "name": "유지안", "select": 13.7, "essay": 0.0, "total": 13.7}, {"rank": 241, "class": 5, "name": "최민재", "select": 13.5, "essay": 0.0, "total": 13.5}, {"rank": 242, "class": 3, "name": "오민관", "select": 9.9, "essay": 0.0, "total": 9.9}]};
+
+// Color palette
+const COLORS = ['#2d6a9f','#38a169','#d69e2e','#e53e3e','#805ad5','#dd6b20','#319795','#d53f8c','#718096'];
+const COLORS_ALPHA = COLORS.map(c => c + '33');
+
+// --- KPI Cards ---
+function renderKPI() {
+  const o = DATA.overview;
+  const kpis = [
+    {label:'응시 인원', value:o.total_students+'명', sub:'9개 반'},
+    {label:'전체 평균', value:o.mean+'점', sub:'100점 만점'},
+    {label:'중앙값', value:o.median+'점', sub:''},
+    {label:'표준편차', value:o.std, sub:''},
+    {label:'최고점', value:o.max+'점', sub:''},
+    {label:'최저점', value:o.min+'점', sub:''},
+  ];
+  document.getElementById('kpiRow').innerHTML = kpis.map(k =>
+    `<div class="kpi-card"><div class="label">${k.label}</div><div class="value">${k.value}</div><div class="sub">${k.sub}</div></div>`
+  ).join('');
+}
+
+// --- Tabs ---
+function showTab(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel-'+id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// --- Overview Charts ---
+let chartOverviewDist, chartScoreType, chartClassMean;
+function renderOverview() {
+  const dist = DATA.score_dist;
+  chartOverviewDist = new Chart(document.getElementById('chartOverviewDist'), {
+    type:'bar', data:{labels:dist.labels, datasets:[{label:'인원', data:dist.all, backgroundColor:'rgba(45,106,159,0.7)', borderRadius:6}]},
+    options:{responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true, title:{display:true,text:'인원(명)'}}, x:{title:{display:true,text:'점수 구간'}}}}
+  });
+
+  const st = DATA.score_types;
+  chartScoreType = new Chart(document.getElementById('chartScoreType'), {
+    type:'bar', data:{labels:['선택형 (80점 만점)','서답형 (20점 만점)'],
+      datasets:[{label:'전체 평균', data:[st.select_mean, st.essay_mean], backgroundColor:['rgba(45,106,159,0.7)','rgba(56,161,105,0.7)'], borderRadius:6}]},
+    options:{responsive:true, indexAxis:'y', plugins:{legend:{display:false}},
+      scales:{x:{beginAtZero:true, max:80}}}
+  });
+
+  const cs = DATA.class_stats;
+  chartClassMean = new Chart(document.getElementById('chartClassMean'), {
+    type:'bar', data:{labels:cs.map(c=>c.class+'반'),
+      datasets:[
+        {label:'평균', data:cs.map(c=>c.mean), backgroundColor:COLORS.map(c=>c+'99'), borderRadius:6},
+      ]},
+    options:{responsive:true, plugins:{legend:{display:false},
+      annotation:{}},
+      scales:{y:{beginAtZero:true, max:100, title:{display:true,text:'점수'}}}}
+  });
+  // Add overall mean line via plugin
+}
+
+// --- Class Compare ---
+function renderClassCompare() {
+  const cs = DATA.class_stats;
+  const tbody = document.querySelector('#classTable tbody');
+  tbody.innerHTML = cs.map(c => `<tr>
+    <td><b>${c.class}반</b></td><td>${c.n}</td><td><b>${c.mean}</b></td><td>${c.median}</td>
+    <td>${c.std}</td><td>${c.max}</td><td>${c.min}</td><td>${c.q1}</td><td>${c.q3}</td>
+    <td>${c.select_mean}</td><td>${c.essay_mean}</td>
+  </tr>`).join('');
+
+  // Box plot
+  const area = document.getElementById('boxplotArea');
+  area.innerHTML = cs.map(c => {
+    const toX = v => ((v / 100) * 100) + '%';
+    return `<div class="boxplot-row">
+      <div class="boxplot-label">${c.class}반</div>
+      <div class="boxplot-area">
+        <div class="boxplot-line" style="left:${c.min}%;width:${c.max-c.min}%"></div>
+        <div class="boxplot-box" style="left:${c.q1}%;width:${c.q3-c.q1}%"></div>
+        <div class="boxplot-median" style="left:${c.median}%"></div>
+        <div class="boxplot-cap" style="left:${c.min-0.4}%"></div>
+        <div class="boxplot-cap" style="left:${c.max-0.4}%"></div>
+      </div>
+    </div>`;
+  }).join('') + '<div style="display:flex;justify-content:space-between;font-size:10px;color:#a0aec0;padding-left:50px"><span>0</span><span>25</span><span>50</span><span>75</span><span>100</span></div>';
+
+  // Stacked bar
+  const dist = DATA.score_dist;
+  const datasets = [];
+  const barColors = ['#fed7d7','#feebc8','#fefcbf','#c6f6d5','#b2f5ea','#bee3f8','#c4b5fd','#fbb6ce','#e2e8f0','#9ae6b4'];
+  dist.labels.forEach((label, i) => {
+    datasets.push({
+      label: label,
+      data: cs.map(c => dist['class_'+c.class][i]),
+      backgroundColor: barColors[i]
+    });
+  });
+  new Chart(document.getElementById('chartClassDist'), {
+    type:'bar', data:{labels:cs.map(c=>c.class+'반'), datasets},
+    options:{responsive:true, plugins:{legend:{position:'bottom',labels:{font:{size:10}}}},
+      scales:{x:{stacked:true},y:{stacked:true, title:{display:true,text:'인원(명)'}}}}
+  });
+}
+
+// --- Item Analysis ---
+function renderItemAnalysis() {
+  const items = DATA.item_analysis;
+  // Bars
+  const bars = document.getElementById('itemBars');
+  bars.innerHTML = items.map(item => {
+    const rate = item.correct_rate;
+    const colorClass = rate >= 70 ? 'rate-high' : rate >= 50 ? 'rate-mid' : 'rate-low';
+    const pointLabel = item.point > 0 ? item.point+'점' : '무배점';
+    return `<div class="item-bar">
+      <div class="q-label">${item.q}번</div>
+      <div class="bar-bg"><div class="bar-fill ${colorClass}" style="width:${rate}%">${rate}%</div></div>
+      <div class="point-label">${pointLabel}</div>
+    </div>`;
+  }).join('');
+
+  // Chart
+  new Chart(document.getElementById('chartItemRate'), {
+    type:'bar', data:{labels:items.map(i=>i.q+'번'),
+      datasets:[{label:'정답률(%)', data:items.map(i=>i.correct_rate),
+        backgroundColor:items.map(i => i.correct_rate >= 70 ? 'rgba(56,161,105,0.7)' : i.correct_rate >= 50 ? 'rgba(214,158,46,0.7)' : 'rgba(229,62,62,0.7)'),
+        borderRadius:4}]},
+    options:{responsive:true, plugins:{legend:{display:false}},
+      scales:{y:{beginAtZero:true, max:100, title:{display:true,text:'정답률(%)'}},
+        x:{title:{display:true,text:'문항번호'}}}}
+  });
+
+  // Item select dropdown
+  const sel = document.getElementById('itemSelect');
+  sel.innerHTML = items.map(i => `<option value="${i.q}">${i.q}번 (정답:${i.answer}, 배점:${i.point}, 정답률:${i.correct_rate}%)</option>`).join('');
+  showItemDetail();
+
+  // Heatmap
+  renderHeatmap();
+}
+
+let chartItemWrong;
+function showItemDetail() {
+  const qNum = parseInt(document.getElementById('itemSelect').value);
+  const item = DATA.item_analysis.find(i => i.q === qNum);
+  const area = document.getElementById('itemDetailArea');
+
+  let wrongHtml = '<div class="wrong-detail">';
+  wrongHtml += `<p><b>정답:</b> <span class="correct-chip">${item.answer}번</span> | <b>배점:</b> ${item.point}점 | <b>정답률:</b> ${item.correct_rate}%</p>`;
+  wrongHtml += '<p style="margin-top:6px"><b>오답 선택지 분포:</b> ';
+  const wrongEntries = Object.entries(item.wrong_dist).sort((a,b) => b[1]-a[1]);
+  if(wrongEntries.length === 0) wrongHtml += '(오답 없음)';
+  else wrongHtml += wrongEntries.map(([k,v]) => `<span class="wrong-chip">${k}번: ${v}명</span>`).join(' ');
+  wrongHtml += '</p>';
+
+  wrongHtml += '<p style="margin-top:6px"><b>반별 정답률:</b> ';
+  for(let c = 1; c <= 9; c++) {
+    const r = item.class_rates[c] || 0;
+    const color = r >= 70 ? '#276749' : r >= 50 ? '#975a16' : '#c53030';
+    wrongHtml += `<span style="color:${color};font-weight:600;margin-right:8px">${c}반:${r}%</span>`;
+  }
+  wrongHtml += '</p></div>';
+  area.innerHTML = wrongHtml;
+
+  // Wrong dist chart
+  if(chartItemWrong) chartItemWrong.destroy();
+  const labels = ['1','2','3','4','5'];
+  const correctNum = Math.round(item.correct_rate * DATA.overview.total_students / 100);
+  const chartData = labels.map(l => {
+    if(parseInt(l) === item.answer) return correctNum;
+    return item.wrong_dist[l] || 0;
+  });
+  const bgColors = labels.map(l => parseInt(l) === item.answer ? 'rgba(56,161,105,0.7)' : 'rgba(229,62,62,0.5)');
+
+  chartItemWrong = new Chart(document.getElementById('chartItemWrong'), {
+    type:'bar', data:{labels:labels.map(l=>l+'번'), datasets:[{label:'선택 인원', data:chartData, backgroundColor:bgColors, borderRadius:4}]},
+    options:{responsive:true, plugins:{legend:{display:false}}, scales:{y:{beginAtZero:true, title:{display:true,text:'인원'}}, x:{title:{display:true,text:'선택지'}}}}
+  });
+}
+
+function renderHeatmap() {
+  const items = DATA.item_analysis;
+  let html = '<table><thead><tr><th>반</th>';
+  items.forEach(i => html += `<th>${i.q}</th>`);
+  html += '</tr></thead><tbody>';
+  for(let c = 1; c <= 9; c++) {
+    html += `<tr><td><b>${c}반</b></td>`;
+    items.forEach(i => {
+      const r = i.class_rates[c] || 0;
+      const bg = r >= 80 ? '#c6f6d5' : r >= 60 ? '#fefcbf' : r >= 40 ? '#feebc8' : '#fed7d7';
+      html += `<td style="background:${bg};font-weight:600;font-size:11px">${r}</td>`;
+    });
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  document.getElementById('heatmapArea').innerHTML = html;
+}
+
+// --- Score Distribution ---
+let chartDistHist, chartDistCum, chartDistPie;
+function renderScoreDist() {
+  const sel = document.getElementById('distClassFilter');
+  for(let c = 1; c <= 9; c++) sel.innerHTML += `<option value="${c}">${c}반</option>`;
+  updateDistChart();
+}
+
+function updateDistChart() {
+  const cls = document.getElementById('distClassFilter').value;
+  const dist = DATA.score_dist;
+  const d = cls === 'all' ? dist.all : dist['class_'+cls];
+
+  if(chartDistHist) chartDistHist.destroy();
+  chartDistHist = new Chart(document.getElementById('chartDistHist'), {
+    type:'bar', data:{labels:dist.labels, datasets:[{label:'인원', data:d,
+      backgroundColor:'rgba(45,106,159,0.7)', borderRadius:6}]},
+    options:{responsive:true, plugins:{legend:{display:false}},
+      scales:{y:{beginAtZero:true, title:{display:true,text:'인원(명)'}}, x:{title:{display:true,text:'점수 구간'}}}}
+  });
+
+  // Cumulative
+  const cumData = [];
+  let cum = 0;
+  const total = d.reduce((a,b)=>a+b,0);
+  for(let i = d.length-1; i >= 0; i--) {
+    cum += d[i];
+    cumData.unshift(Math.round(cum/total*100*10)/10);
+  }
+  if(chartDistCum) chartDistCum.destroy();
+  chartDistCum = new Chart(document.getElementById('chartDistCum'), {
+    type:'line', data:{labels:dist.labels, datasets:[{label:'누적 비율(%)', data:cumData,
+      borderColor:'#2d6a9f', backgroundColor:'rgba(45,106,159,0.1)', fill:true, tension:0.3, pointRadius:4}]},
+    options:{responsive:true, plugins:{legend:{display:false}},
+      scales:{y:{beginAtZero:true, max:100, title:{display:true,text:'누적 비율(%)'}}, x:{title:{display:true,text:'점수 구간 이상'}}}}
+  });
+
+  // Pie
+  if(chartDistPie) chartDistPie.destroy();
+  const pieLabels = ['90점 이상','70~89점','50~69점','50점 미만'];
+  const pieData = [
+    d[9],
+    d[7]+d[8],
+    d[5]+d[6],
+    d[0]+d[1]+d[2]+d[3]+d[4]
+  ];
+  chartDistPie = new Chart(document.getElementById('chartDistPie'), {
+    type:'doughnut', data:{labels:pieLabels, datasets:[{data:pieData,
+      backgroundColor:['#38a169','#2d6a9f','#d69e2e','#e53e3e']}]},
+    options:{responsive:true, plugins:{legend:{position:'right'}}}
+  });
+}
+
+// --- Student List ---
+function renderStudentList() {
+  const sel = document.getElementById('studentClassFilter');
+  for(let c = 1; c <= 9; c++) sel.innerHTML += `<option value="${c}">${c}반</option>`;
+  filterStudents();
+}
+
+function filterStudents() {
+  const cls = document.getElementById('studentClassFilter').value;
+  const search = document.getElementById('studentSearch').value.trim().toLowerCase();
+  let students = DATA.students;
+  if(cls !== 'all') students = students.filter(s => s.class == parseInt(cls));
+  if(search) students = students.filter(s => s.name.toLowerCase().includes(search));
+
+  // Re-rank within filter
+  const tbody = document.getElementById('studentTableBody');
+  tbody.innerHTML = students.map((s, i) => {
+    let rankBadge = '';
+    if(s.rank <= 3) rankBadge = ` <span class="rank-badge rank-${s.rank}">${s.rank}등</span>`;
+    return `<tr>
+      <td>${s.rank}${rankBadge}</td>
+      <td>${s.class}반</td>
+      <td style="text-align:left">${s.name}</td>
+      <td>${s.select}</td>
+      <td>${s.essay}</td>
+      <td><b>${s.total}</b></td>
+    </tr>`;
+  }).join('');
+}
+
+// --- Init ---
+renderKPI();
+renderOverview();
+renderClassCompare();
+renderItemAnalysis();
+renderScoreDist();
+renderStudentList();
+</script>
+</body>
+</html>
