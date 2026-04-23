@@ -1598,69 +1598,48 @@ function switchModalTab(name, btn) {
   document.getElementById('modalTab-' + name).style.display = 'block';
 }
 
-function loadSampleItemInfo() {
-  // 2026학년도 1학기 중간고사 통합과학1 문항정보표 (선택형 26 + 서답형 4, 27~30번)
-  // 형식: 문항번호 \t 내용영역 \t 성취기준 \t 난이도 \t 배점 \t 정답
-  const STD = {
-    A2: '[10통과1-01-02] 과학 탐구에서 중요한 기본량의 의미를 알고, 자연 현상을 기술하는 데 단위가 가지는 의미와 적용사례를 설명할 수 있다.',
-    A3: '[10통과1-01-03] 과학 탐구에서 측정과 어림의 의미를 알고, 일상생활의 여러 가지 상황에서 측정 표준의 유용성과 필요성을 논증할 수 있다.',
-    A4: '[10통과1-01-04] 자연에서 일어나는 다양한 변화를 측정·분석하여 정보를 산출함을 알고, 이러한 정보를 디지털로 변환하는 기술을 정보 통신에 활용하여 현대 문명에 미친 영향을 인식한다.',
-    A1: '[10통과1-01-01] 자연을 시간과 공간에서 기술할 수 있음을 알고, 길이와 시간 측정의 현대적 방법과 다양한 규모의 측정 사례를 조사할 수 있다.',
-    B1: '[10통과1-02-01] 천체에서 방출되는 빛의 스펙트럼을 분석하여 우주 초기에 형성된 원소와 천체의 구성 물질을 추론할 수 있다.',
-    B2: '[10통과1-02-02] 우주 초기의 원소들로부터 태양계의 재료이면서 생명체를 구성하는 원소들이 형성되는 과정을 통해 지구와 생명의 역사가 우주 역사의 일부분임을 해석할 수 있다.',
-    B3: '[10통과1-02-03] 세상을 구성하는 원소들의 성질이 주기성을 나타내는 현상을 통해 자연의 규칙성을 도출하고, 지구와 생명체를 구성하는 주요 원소들이 결합을 형성하는 이유를 해석할 수 있다.',
-    B4: '[10통과1-02-04] 인류의 생존에 필수적인 물, 산소, 소금 등이 만들어지는 결합의 차이를 이해하고 각 물질의 성질과 관련지어 설명할 수 있다.',
-    B5: '[10통과1-02-05] 지각과 생명체를 구성하는 물질들이 기본 단위체의 결합을 통해서 형성된다는 것을 규산염 광물, 단백질과 핵산의 예를 통해 설명할 수 있다.',
-    B6: '[10통과1-02-06] 지구를 구성하는 물질을 전기적 성질에 따라 구분할 수 있고, 물질의 전기적 성질을 응용하여 일상생활과 첨단기술에서 다양한 소재로 활용됨을 인식한다.',
-    C6: '[10통과1-03-06] 생명 시스템의 유지에 필요한 세포 내 정보의 흐름을 유전자로부터 단백질이 만들어지는 과정을 중심으로 설명할 수 있다.'
-  };
-  const rows = [
-    // 선택형
-    [1, '과학의 기초', STD.A2, '쉬움', 3.1, 5],
-    [2, '과학의 기초', STD.A2, '쉬움', 3.3, 1],
-    [3, '과학의 기초', STD.A3, '쉬움', 3.2, 2],
-    [4, '과학의 기초', STD.A4, '쉬움', 3.5, 4],
-    [5, '과학의 기초', STD.A2, '보통', 3.5, 3],
-    [6, '과학의 기초', STD.A3, '보통', 3.4, 5],
-    [7, '물질과 규칙성', STD.B4, '쉬움', 3.2, 1],
-    [8, '물질과 규칙성', STD.B4, '쉬움', 3.5, 3],
-    [9, '물질과 규칙성', STD.B4, '보통', 3.1, 5],
-    [10, '물질과 규칙성', STD.B4, '보통', 3.4, 2],
-    [11, '물질과 규칙성', STD.B4, '보통', 3.3, 4],
-    [12, '물질과 규칙성', STD.B6, '어려움', 3.5, 1],
-    [13, '물질과 규칙성', STD.B5, '쉬움', 3.1, 1],
-    [14, '물질과 규칙성', STD.B5, '보통', 3.3, 2],
-    [15, '물질과 규칙성', STD.B5, '보통', 3.2, 5],
-    [16, '시스템과 상호작용', STD.C6, '쉬움', 3.5, 2],
-    [17, '시스템과 상호작용', STD.C6, '어려움', 3.4, 4],
-    [18, '시스템과 상호작용', STD.C6, '어려움', 3.5, 3],
-    [19, '물질과 규칙성', STD.B1, '어려움', 3.5, 5],
-    [20, '물질과 규칙성', STD.B1, '어려움', 3.5, 4],
-    [21, '물질과 규칙성', STD.B1, '어려움', 0, 1],
-    [22, '물질과 규칙성', STD.B2, '어려움', 3.3, 4],
-    [23, '물질과 규칙성', STD.B2, '어려움', 3.2, 3],
-    [24, '시스템과 상호작용', STD.C6, '보통', 3.1, 2],
-    [25, '시스템과 상호작용', STD.C6, '보통', 1.7, 1],
-    [26, '물질과 규칙성', STD.B3, '어려움', 1.7, 4],
-    // 서답형 (27~30번으로 이어서 표기)
-    [27, '과학의 기초', STD.A1, '어려움', 5, '별지 참조'],
-    [28, '물질과 규칙성', STD.B4, '어려움', 5, '별지 참조'],
-    [29, '물질과 규칙성', STD.B5, '어려움', 5, '별지 참조'],
-    [30, '물질과 규칙성', STD.B1, '어려움', 5, '별지 참조']
-  ];
-  const sample = rows.map(r => r.join('\t')).join('\n');
-  document.getElementById('itemInfoTextarea').value = sample;
-
-  // 텍스트 붙여넣기 탭(두 번째)으로 전환하여 로드된 데이터를 보이게 함
-  const pasteTabBtn = document.querySelectorAll('.modal-tab')[1];
-  if (pasteTabBtn) pasteTabBtn.click();
-
-  // 사용자에게 샘플이 로드됐음을 알림
+async function loadSampleItemInfo() {
+  // 실제 문항정보표 엑셀 파일(배포 경로에 포함)을 fetch하여 파싱
+  const SAMPLE_URL = '문항정보표_1학기중간_통합과학1_v2_1.xlsx';
   const status = document.getElementById('itemInfoStatus');
-  if (status) {
-    status.className = 'modal-info success';
-    status.style.display = 'block';
-    status.innerHTML = `✓ 샘플 문항정보 ${rows.length}개가 입력되었습니다. "등록하기"를 눌러 확정하세요.`;
+
+  try {
+    if (status) {
+      status.className = 'modal-info';
+      status.style.display = 'block';
+      status.textContent = '샘플 문항정보표를 불러오는 중...';
+    }
+
+    const resp = await fetch(encodeURI(SAMPLE_URL));
+    if (!resp.ok) throw new Error(`샘플 파일을 불러올 수 없습니다 (HTTP ${resp.status})`);
+    const blob = await resp.blob();
+    const file = new File([blob], SAMPLE_URL, { type: blob.type });
+
+    // 기존 엑셀 파서 재사용
+    const items = await parseItemInfoFile(file);
+    if (!items || items.length === 0) {
+      throw new Error('파싱된 문항이 없습니다. 샘플 파일 형식을 확인하세요.');
+    }
+
+    // 등록된 것처럼 ITEM_INFO에 바로 반영하고 모달 닫기
+    ITEM_INFO = items;
+    activateItemInfoSections();
+
+    if (status) {
+      status.className = 'modal-info success';
+      status.style.display = 'block';
+      status.innerHTML = `✓ 샘플 문항정보 ${items.length}개가 등록되었습니다. 영역별·성취기준별·난이도 검증 분석이 활성화되었습니다.`;
+    }
+    setTimeout(closeItemInfoModal, 1200);
+  } catch (err) {
+    console.error(err);
+    if (status) {
+      status.className = 'modal-info error';
+      status.style.display = 'block';
+      status.textContent = '샘플 불러오기 실패: ' + err.message;
+    } else {
+      alert('샘플 불러오기 실패: ' + err.message);
+    }
   }
 }
 
