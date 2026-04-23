@@ -1840,6 +1840,22 @@ function updateTestPaperButtonState() {
 // ============================================================
 // AI 성취수준 분석 (B안)
 // ============================================================
+const ADMIN_CODE_STORAGE = 'grade_analysis_admin_code';
+
+function getAdminCode() {
+  return sessionStorage.getItem(ADMIN_CODE_STORAGE) || localStorage.getItem(ADMIN_CODE_STORAGE) || '';
+}
+
+function promptAdminCode() {
+  const code = prompt('🔐 AI 분석을 위한 관리자 코드를 입력하세요.\n(Vercel 환경변수 ADMIN_CODE와 일치해야 합니다)');
+  if (code && code.trim()) {
+    const trimmed = code.trim();
+    localStorage.setItem(ADMIN_CODE_STORAGE, trimmed);
+    return trimmed;
+  }
+  return '';
+}
+
 function updateAIAnalyzeButtonState() {
   const btn = document.getElementById('btnAIAnalyze');
   if (!btn) return;
@@ -1916,6 +1932,15 @@ async function runAIAnalysis() {
     return;
   }
 
+  // 관리자 코드가 저장되어 있지 않으면 먼저 입력받기
+  if (!getAdminCode()) {
+    const entered = promptAdminCode();
+    if (!entered) {
+      alert('관리자 코드가 없으면 AI 분석을 실행할 수 없습니다.');
+      return;
+    }
+  }
+
   const student = DATA.students.find(s => s.rank === parseInt(rank));
   if (!student) { alert('학생 데이터를 찾을 수 없습니다.'); return; }
 
@@ -1953,9 +1978,25 @@ async function runAIAnalysis() {
 
     const resp = await fetch('/api/analyze', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Admin-Code': getAdminCode() || ''
+      },
       body: JSON.stringify(body)
     });
+
+    if (resp.status === 401) {
+      // 관리자 코드 불일치 → 저장된 코드 삭제하고 다시 입력 요청
+      localStorage.removeItem('grade_analysis_admin_code');
+      const newCode = promptAdminCode();
+      if (newCode) {
+        status.textContent = '관리자 코드를 다시 확인했습니다. "분석 시작"을 눌러주세요.';
+        status.className = 'modal-info';
+      } else {
+        throw new Error('관리자 코드가 필요합니다.');
+      }
+      return;
+    }
 
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({}));
