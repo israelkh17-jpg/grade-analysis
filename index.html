@@ -440,6 +440,45 @@ tr:hover{background:#f7fafc;}
   </div>
 </div>
 
+<!-- 출제원안지 등록 모달 -->
+<div class="modal-overlay" id="testPaperModal">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2>📄 출제원안지 등록</h2>
+      <button class="modal-close" onclick="closeTestPaperModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:#4a5568;margin-bottom:12px;">
+        출제원안지(시험지) PDF를 등록하면, 문항정보표·학생 성적과 함께 <b>AI가 내용 영역별 성취수준 진술문</b>을 자동으로 생성합니다.
+      </p>
+
+      <div style="background:#fef3c7;border:1px solid #fde68a;border-radius:8px;padding:12px 14px;margin-bottom:14px;font-size:12px;color:#78350f;line-height:1.7;">
+        <b>📌 분석 작동 조건</b><br>
+        1. <b>출제원안지 PDF</b> (이 모달에서 등록)<br>
+        2. <b>문항정보표</b> (📋 버튼에서 등록)<br>
+        3. <b>학생 성적 데이터</b> (1반~9반 정오표)<br>
+        세 가지가 모두 등록되면 AI 분석 버튼이 활성화됩니다.
+      </div>
+
+      <p style="font-size:12px;color:#718096;margin-bottom:8px;">
+        시험지 원본 PDF를 업로드하세요. Gemini 멀티모달 AI가 문항 내용을 직접 읽어 분석합니다.
+      </p>
+      <input type="file" id="testPaperPdfFile" accept=".pdf" style="margin-bottom:8px;" onchange="previewTestPaper(this)">
+      <p style="font-size:11px;color:#a0aec0;">
+        📌 지원 형식: PDF (최대 15MB)<br>
+        📌 업로드된 파일은 브라우저에만 저장되며, AI 분석 시에만 API 서버로 전송됩니다.
+      </p>
+      <div id="testPaperPreview" style="margin-top:10px;font-size:12px;color:#15803d;"></div>
+      <div class="modal-info" id="testPaperStatus"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-modal btn-modal-secondary" onclick="closeTestPaperModal()">취소</button>
+      <button class="btn-modal btn-modal-primary" onclick="loadSampleTestPaper()">샘플 데이터 사용</button>
+      <button class="btn-modal btn-modal-primary" onclick="registerTestPaper()">등록하기</button>
+    </div>
+  </div>
+</div>
+
 <!-- Upload Screen -->
 <div id="uploadScreen">
   <h1>지필평가 성적 분석 도구</h1>
@@ -489,6 +528,7 @@ tr:hover{background:#f7fafc;}
       <p id="dashSubtitle"></p>
     </div>
     <div class="right">
+      <button class="btn-back" id="btnRegisterTestPaper" onclick="openTestPaperModal()">📄 출제원안지 등록</button>
       <button class="btn-back" id="btnRegisterItemInfo" onclick="openItemInfoModal()">📋 문항정보 등록</button>
       <button class="btn-back" onclick="goBack()">다른 과목 분석</button>
       <button class="btn-print" onclick="window.print()">인쇄</button>
@@ -1596,6 +1636,139 @@ function switchModalTab(name, btn) {
   btn.classList.add('active');
   document.querySelectorAll('.modal-tab-content').forEach(c => c.style.display = 'none');
   document.getElementById('modalTab-' + name).style.display = 'block';
+}
+
+// ============================================================
+// 출제원안지 (Test Paper) 등록
+// ============================================================
+let TEST_PAPER_PDF = null; // { name, base64, size } - 등록 후 AI 분석에 사용
+
+function openTestPaperModal() {
+  document.getElementById('testPaperModal').classList.add('show');
+  const status = document.getElementById('testPaperStatus');
+  status.className = 'modal-info';
+  status.style.display = 'none';
+  status.textContent = '';
+
+  // 이미 등록된 경우 미리보기 표시
+  const preview = document.getElementById('testPaperPreview');
+  if (TEST_PAPER_PDF) {
+    preview.innerHTML = `✓ 등록된 파일: <b>${TEST_PAPER_PDF.name}</b> (${(TEST_PAPER_PDF.size/1024).toFixed(1)} KB)`;
+  } else {
+    preview.innerHTML = '';
+  }
+}
+
+function closeTestPaperModal() {
+  document.getElementById('testPaperModal').classList.remove('show');
+}
+
+function previewTestPaper(input) {
+  const file = input.files[0];
+  const preview = document.getElementById('testPaperPreview');
+  if (!file) { preview.innerHTML = ''; return; }
+  preview.innerHTML = `📄 선택된 파일: <b>${file.name}</b> (${(file.size/1024).toFixed(1)} KB)`;
+}
+
+async function registerTestPaper() {
+  const input = document.getElementById('testPaperPdfFile');
+  const status = document.getElementById('testPaperStatus');
+  const file = input.files[0];
+
+  if (!file && !TEST_PAPER_PDF) {
+    status.className = 'modal-info error';
+    status.style.display = 'block';
+    status.textContent = 'PDF 파일을 먼저 선택해주세요.';
+    return;
+  }
+
+  if (file) {
+    if (file.size > 15 * 1024 * 1024) {
+      status.className = 'modal-info error';
+      status.style.display = 'block';
+      status.textContent = '파일 크기가 15MB를 초과합니다.';
+      return;
+    }
+
+    try {
+      status.className = 'modal-info';
+      status.style.display = 'block';
+      status.textContent = 'PDF를 읽는 중...';
+
+      const base64 = await fileToBase64(file);
+      TEST_PAPER_PDF = { name: file.name, base64, size: file.size };
+
+      status.className = 'modal-info success';
+      status.innerHTML = `✓ 출제원안지 등록 완료: <b>${file.name}</b> — 이제 문항정보 등록과 성적 데이터가 준비되면 AI 분석이 가능합니다.`;
+      updateTestPaperButtonState();
+      setTimeout(closeTestPaperModal, 1200);
+    } catch (err) {
+      status.className = 'modal-info error';
+      status.textContent = 'PDF 등록 실패: ' + err.message;
+    }
+  } else {
+    // 이미 등록된 상태에서 그냥 닫기
+    closeTestPaperModal();
+  }
+}
+
+async function loadSampleTestPaper() {
+  const SAMPLE_URL = '출제원안지_1학기중간_통합과학1.pdf';
+  const status = document.getElementById('testPaperStatus');
+
+  try {
+    status.className = 'modal-info';
+    status.style.display = 'block';
+    status.textContent = '샘플 출제원안지를 불러오는 중...';
+
+    const resp = await fetch(encodeURI(SAMPLE_URL));
+    if (!resp.ok) throw new Error(`샘플 파일을 불러올 수 없습니다 (HTTP ${resp.status})`);
+    const blob = await resp.blob();
+    const file = new File([blob], SAMPLE_URL, { type: 'application/pdf' });
+
+    const base64 = await fileToBase64(file);
+    TEST_PAPER_PDF = { name: file.name, base64, size: file.size };
+
+    status.className = 'modal-info success';
+    status.innerHTML = `✓ 샘플 출제원안지 등록 완료: <b>${file.name}</b> (${(file.size/1024).toFixed(1)} KB)`;
+    document.getElementById('testPaperPreview').innerHTML = `✓ 등록된 파일: <b>${file.name}</b>`;
+    updateTestPaperButtonState();
+    setTimeout(closeTestPaperModal, 1200);
+  } catch (err) {
+    status.className = 'modal-info error';
+    status.style.display = 'block';
+    status.textContent = '샘플 불러오기 실패: ' + err.message;
+  }
+}
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      // data:application/pdf;base64,XXXX → XXXX 만 추출
+      const comma = result.indexOf(',');
+      resolve(comma >= 0 ? result.slice(comma + 1) : result);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function updateTestPaperButtonState() {
+  const btn = document.getElementById('btnRegisterTestPaper');
+  if (!btn) return;
+  if (TEST_PAPER_PDF) {
+    btn.innerHTML = '✓ 출제원안지 등록됨';
+    btn.style.background = '#dcfce7';
+    btn.style.color = '#166534';
+    btn.style.borderColor = '#86efac';
+  } else {
+    btn.innerHTML = '📄 출제원안지 등록';
+    btn.style.background = '';
+    btn.style.color = '';
+    btn.style.borderColor = '';
+  }
 }
 
 async function loadSampleItemInfo() {
