@@ -1650,7 +1650,18 @@ function loadSampleItemInfo() {
   ];
   const sample = rows.map(r => r.join('\t')).join('\n');
   document.getElementById('itemInfoTextarea').value = sample;
-  document.querySelector('.modal-tab').click();
+
+  // 텍스트 붙여넣기 탭(두 번째)으로 전환하여 로드된 데이터를 보이게 함
+  const pasteTabBtn = document.querySelectorAll('.modal-tab')[1];
+  if (pasteTabBtn) pasteTabBtn.click();
+
+  // 사용자에게 샘플이 로드됐음을 알림
+  const status = document.getElementById('itemInfoStatus');
+  if (status) {
+    status.className = 'modal-info success';
+    status.style.display = 'block';
+    status.innerHTML = `✓ 샘플 문항정보 ${rows.length}개가 입력되었습니다. "등록하기"를 눌러 확정하세요.`;
+  }
 }
 
 function parseItemInfoText(text) {
