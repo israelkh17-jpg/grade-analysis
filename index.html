@@ -38,6 +38,26 @@ body{font-family:'Pretendard','Apple SD Gothic Neo','Noto Sans KR',sans-serif;ba
 .info-box{width:100%;max-width:600px;background:#ebf8ff;border:1px solid #bee3f8;border-radius:10px;padding:16px 20px;margin-top:24px;font-size:12px;color:#2a4365;line-height:1.7;}
 .info-box b{color:#1e3a5f;}
 
+/* 샘플 데이터 버튼 */
+.btn-sample{
+  width:100%;max-width:600px;margin-top:20px;padding:18px 24px;
+  background:linear-gradient(135deg,#f0fdf4,#dcfce7);
+  border:2px dashed #86efac;border-radius:12px;
+  display:flex;align-items:center;justify-content:center;gap:12px;
+  font-family:inherit;cursor:pointer;transition:all 0.2s;
+}
+.btn-sample:hover:not(:disabled){
+  border-color:#22c55e;background:linear-gradient(135deg,#dcfce7,#bbf7d0);
+  transform:translateY(-1px);box-shadow:0 4px 14px rgba(34,197,94,0.18);
+}
+.btn-sample:disabled{opacity:0.6;cursor:not-allowed;transform:none;}
+.btn-sample .sample-icon{font-size:24px;}
+.btn-sample .sample-text{display:flex;flex-direction:column;align-items:flex-start;text-align:left;}
+.btn-sample .sample-title{font-size:14px;font-weight:700;color:#15803d;}
+.btn-sample .sample-desc{font-size:11.5px;color:#166534;margin-top:2px;}
+.btn-sample.loading .sample-icon{animation:spin 1s linear infinite;}
+@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+
 /* 다운로드 안내 버튼 */
 .btn-guide{
   width:100%;max-width:600px;margin-top:12px;padding:14px 20px;
@@ -436,6 +456,15 @@ tr:hover{background:#f7fafc;}
   <p class="error-msg" id="errorMsg"></p>
   <button class="btn-generate" id="btnGenerate" onclick="generateDashboard()">대시보드 생성</button>
 
+  <!-- 샘플 데이터 사용하기 -->
+  <button class="btn-sample" id="btnSample" onclick="loadSampleGradeData()">
+    <span class="sample-icon">🧪</span>
+    <span class="sample-text">
+      <span class="sample-title">샘플 데이터 사용하기</span>
+      <span class="sample-desc">2025학년도 1학기 중간고사 통합과학1 · 9개 반 익명화 데이터 자동 로드</span>
+    </span>
+  </button>
+
   <div class="info-box">
     <b>사용 방법</b><br>
     1. 과목별 반별 정오표 엑셀 파일(1반~9반)을 드래그&드롭 또는 클릭하여 업로드<br>
@@ -661,6 +690,51 @@ function handleFiles(files) {
     uploadedFiles.set(f.name, f);
   }
   renderFileList();
+}
+
+// 샘플 데이터 (9개 반 익명화 엑셀) 자동 로드
+async function loadSampleGradeData() {
+  const btn = document.getElementById('btnSample');
+  const textEl = btn.querySelector('.sample-title');
+  const descEl = btn.querySelector('.sample-desc');
+  const originalTitle = textEl.textContent;
+  const originalDesc = descEl.textContent;
+
+  btn.disabled = true;
+  btn.classList.add('loading');
+  textEl.textContent = '샘플 파일 불러오는 중...';
+  descEl.textContent = '9개 반 정오표를 다운로드하고 있어요';
+
+  const fileNames = [];
+  for (let cls = 101; cls <= 109; cls++) {
+    fileNames.push(`2025_1학기중간_${cls}_익명화.xlsx`);
+  }
+
+  try {
+    const results = await Promise.all(
+      fileNames.map(async name => {
+        const resp = await fetch(encodeURI(name));
+        if (!resp.ok) throw new Error(`${name}: ${resp.status}`);
+        const blob = await resp.blob();
+        return new File([blob], name, { type: blob.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      })
+    );
+    handleFiles(results);
+
+    // 기존 오류 메시지 초기화
+    errorMsg.textContent = '';
+    textEl.textContent = '샘플 데이터 로드 완료 ✓';
+    descEl.textContent = `${results.length}개 파일 준비됨 — "대시보드 생성"을 눌러주세요`;
+  } catch (err) {
+    console.error(err);
+    errorMsg.textContent = '샘플 파일을 불러오지 못했어요. 새로고침 후 다시 시도해주세요.';
+    textEl.textContent = originalTitle;
+    descEl.textContent = originalDesc;
+    btn.disabled = false;
+  } finally {
+    btn.classList.remove('loading');
+    // 성공 시에는 비활성화 유지(중복 로드 방지), 버튼은 상태만 변경되어 그대로 둠
+  }
 }
 
 function removeFile(name) {
