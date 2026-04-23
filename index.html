@@ -38,6 +38,30 @@ body{font-family:'Pretendard','Apple SD Gothic Neo','Noto Sans KR',sans-serif;ba
 .info-box{width:100%;max-width:600px;background:#ebf8ff;border:1px solid #bee3f8;border-radius:10px;padding:16px 20px;margin-top:24px;font-size:12px;color:#2a4365;line-height:1.7;}
 .info-box b{color:#1e3a5f;}
 
+/* AI 분석 결과 카드 */
+.ai-area-card{
+  border:1px solid #e2e8f0;border-radius:10px;padding:14px 16px;margin-bottom:10px;
+  background:linear-gradient(180deg,#ffffff,#f8fafc);
+}
+.ai-area-head{display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;}
+.ai-area-name{font-size:14px;font-weight:700;color:#1e3a5f;}
+.ai-mastery-badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:11px;font-weight:700;}
+.ai-mastery-상{background:#dcfce7;color:#15803d;}
+.ai-mastery-중{background:#fef3c7;color:#a16207;}
+.ai-mastery-하{background:#fee2e2;color:#b91c1c;}
+.ai-area-progress{flex:1;min-width:100px;height:8px;background:#e2e8f0;border-radius:4px;overflow:hidden;}
+.ai-area-progress-fill{height:100%;background:linear-gradient(90deg,#3b82f6,#1d4ed8);}
+.ai-area-score{font-size:11px;color:#4a5568;font-weight:600;white-space:nowrap;}
+.ai-area-statement{font-size:13px;color:#2d3748;line-height:1.7;margin-top:6px;padding:10px;background:#f7fafc;border-radius:6px;border-left:3px solid #3b82f6;}
+.ai-std-chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;}
+.ai-std-chip{font-size:11px;background:#e0f2fe;color:#0369a1;padding:3px 8px;border-radius:999px;}
+.ai-overall{background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 14px;margin-top:10px;font-size:13px;color:#1e40af;line-height:1.7;}
+#btnAIAnalyze:not(:disabled){background:linear-gradient(135deg,#e0f2fe,#bfdbfe);border-color:#60a5fa;color:#1e3a5f;font-weight:700;}
+#btnAIAnalyze:disabled{opacity:0.45;cursor:not-allowed;}
+.ai-loading{display:flex;align-items:center;justify-content:center;gap:10px;padding:30px;color:#4a5568;}
+.ai-spinner{width:22px;height:22px;border:3px solid #cbd5e0;border-top-color:#2d6a9f;border-radius:50%;animation:ai-spin 0.8s linear infinite;}
+@keyframes ai-spin{to{transform:rotate(360deg)}}
+
 /* 샘플 데이터 버튼 */
 .btn-sample{
   width:100%;max-width:600px;margin-top:20px;padding:18px 24px;
@@ -440,6 +464,44 @@ tr:hover{background:#f7fafc;}
   </div>
 </div>
 
+<!-- AI 성취수준 분석 모달 -->
+<div class="modal-overlay" id="aiAnalysisModal">
+  <div class="modal-box" style="max-width:800px;">
+    <div class="modal-header">
+      <h2>🤖 AI 성취수준 분석</h2>
+      <button class="modal-close" onclick="closeAIAnalysisModal()">&times;</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:#4a5568;margin-bottom:12px;">
+        학생을 선택하면, 출제원안지·문항정보·응답 결과를 바탕으로 <b>AI가 내용 영역별 성취수준 진술문</b>을 생성합니다.
+      </p>
+
+      <div style="display:flex;gap:10px;align-items:flex-end;margin-bottom:14px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:200px;">
+          <label style="font-size:12px;color:#4a5568;display:block;margin-bottom:4px;">반 선택</label>
+          <select id="aiClassSelect" onchange="populateAIStudentSelect()" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px;">
+            <option value="">전체 반</option>
+          </select>
+        </div>
+        <div style="flex:2;min-width:250px;">
+          <label style="font-size:12px;color:#4a5568;display:block;margin-bottom:4px;">학생 선택</label>
+          <select id="aiStudentSelect" style="width:100%;padding:8px;border:1px solid #cbd5e0;border-radius:6px;font-size:13px;">
+            <option value="">학생을 선택하세요</option>
+          </select>
+        </div>
+        <button class="btn-modal btn-modal-primary" id="btnAIAnalyzeStart" onclick="runAIAnalysis()" style="padding:9px 18px;">🚀 분석 시작</button>
+      </div>
+
+      <div class="modal-info" id="aiAnalysisStatus" style="display:none;"></div>
+
+      <div id="aiAnalysisResult"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-modal btn-modal-secondary" onclick="closeAIAnalysisModal()">닫기</button>
+    </div>
+  </div>
+</div>
+
 <!-- 출제원안지 등록 모달 -->
 <div class="modal-overlay" id="testPaperModal">
   <div class="modal-box">
@@ -530,6 +592,7 @@ tr:hover{background:#f7fafc;}
     <div class="right">
       <button class="btn-back" id="btnRegisterTestPaper" onclick="openTestPaperModal()">📄 출제원안지 등록</button>
       <button class="btn-back" id="btnRegisterItemInfo" onclick="openItemInfoModal()">📋 문항정보 등록</button>
+      <button class="btn-back" id="btnAIAnalyze" onclick="openAIAnalysisModal()" disabled title="출제원안지·문항정보·학생 성적이 모두 등록되어야 활성화됩니다">🤖 AI 성취수준 분석</button>
       <button class="btn-back" onclick="goBack()">다른 과목 분석</button>
       <button class="btn-print" onclick="window.print()">인쇄</button>
     </div>
@@ -1094,7 +1157,9 @@ function showTab(id, el) {
 
 function renderDashboard(data, examInfo, subjectName) {
   DATA = data;
+  window.DATA = data;
   destroyCharts();
+  if (typeof updateAIAnalyzeButtonState === 'function') updateAIAnalyzeButtonState();
 
   // Title
   document.getElementById('dashTitle').textContent =
@@ -1769,6 +1834,183 @@ function updateTestPaperButtonState() {
     btn.style.color = '';
     btn.style.borderColor = '';
   }
+  updateAIAnalyzeButtonState();
+}
+
+// ============================================================
+// AI 성취수준 분석 (B안)
+// ============================================================
+function updateAIAnalyzeButtonState() {
+  const btn = document.getElementById('btnAIAnalyze');
+  if (!btn) return;
+  const hasTestPaper = !!TEST_PAPER_PDF;
+  const hasItemInfo = !!(ITEM_INFO && ITEM_INFO.length > 0);
+  const hasStudents = !!(window.DATA && DATA.students && DATA.students.length > 0);
+  const ready = hasTestPaper && hasItemInfo && hasStudents;
+  btn.disabled = !ready;
+  if (ready) {
+    btn.title = 'AI 성취수준 분석 시작';
+  } else {
+    const missing = [];
+    if (!hasTestPaper) missing.push('출제원안지');
+    if (!hasItemInfo) missing.push('문항정보');
+    if (!hasStudents) missing.push('학생 성적');
+    btn.title = `필요: ${missing.join(', ')} 등록`;
+  }
+}
+
+function openAIAnalysisModal() {
+  if (!TEST_PAPER_PDF || !ITEM_INFO || !window.DATA) {
+    alert('출제원안지·문항정보·학생 성적 세 가지를 모두 먼저 등록해주세요.');
+    return;
+  }
+  document.getElementById('aiAnalysisModal').classList.add('show');
+  document.getElementById('aiAnalysisResult').innerHTML = '';
+  document.getElementById('aiAnalysisStatus').style.display = 'none';
+
+  populateAIClassSelect();
+  populateAIStudentSelect();
+}
+
+function closeAIAnalysisModal() {
+  document.getElementById('aiAnalysisModal').classList.remove('show');
+}
+
+function populateAIClassSelect() {
+  const sel = document.getElementById('aiClassSelect');
+  if (!window.DATA) return;
+  const classes = [...new Set(DATA.students.map(s => s.class))].sort((a,b) => a-b);
+  sel.innerHTML = '<option value="">전체 반</option>' +
+    classes.map(c => `<option value="${c}">${c}반</option>`).join('');
+}
+
+function populateAIStudentSelect() {
+  const classSel = document.getElementById('aiClassSelect');
+  const studSel = document.getElementById('aiStudentSelect');
+  if (!window.DATA) return;
+
+  let students = DATA.students;
+  const cls = classSel.value;
+  if (cls) students = students.filter(s => s.class == parseInt(cls));
+
+  students = students.slice().sort((a,b) => {
+    if (a.class !== b.class) return a.class - b.class;
+    return (a.classRank || 0) - (b.classRank || 0);
+  });
+
+  studSel.innerHTML = '<option value="">학생을 선택하세요 (' + students.length + '명)</option>' +
+    students.map(s => `<option value="${s.rank}">${s.class}반 ${s.classRank || '-'}등 · ${escapeHTMLForAI(s.name)} (총 ${s.total}점)</option>`).join('');
+}
+
+function escapeHTMLForAI(str) {
+  return String(str ?? '').replace(/[&<>'"]/g, tag => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'
+  }[tag] || tag));
+}
+
+async function runAIAnalysis() {
+  const studSel = document.getElementById('aiStudentSelect');
+  const rank = studSel.value;
+  if (!rank) {
+    alert('학생을 먼저 선택해주세요.');
+    return;
+  }
+
+  const student = DATA.students.find(s => s.rank === parseInt(rank));
+  if (!student) { alert('학생 데이터를 찾을 수 없습니다.'); return; }
+
+  const status = document.getElementById('aiAnalysisStatus');
+  const result = document.getElementById('aiAnalysisResult');
+  const startBtn = document.getElementById('btnAIAnalyzeStart');
+
+  status.className = 'modal-info';
+  status.style.display = 'block';
+  status.textContent = 'AI가 분석 중입니다... (약 10~20초 소요)';
+  result.innerHTML = '<div class="ai-loading"><div class="ai-spinner"></div>성취기준 코드 기반 진술문 생성 중...</div>';
+  startBtn.disabled = true;
+
+  try {
+    // 학생 응답 배열 구성 (문항번호 매핑)
+    const answers = [];
+    for (let i = 0; i < (student.itemCorrect || []).length; i++) {
+      const q = i + 1;
+      answers.push({
+        q,
+        response: student.responses ? student.responses[i] : '',
+        correct: student.itemCorrect[i] === 1
+      });
+    }
+
+    const body = {
+      testPaperPdf: TEST_PAPER_PDF.base64,
+      itemInfo: ITEM_INFO,
+      student: {
+        id: '학생_' + String(student.rank).padStart(3, '0'), // 익명화 ID (이름 대신)
+        classNum: student.class,
+        answers
+      }
+    };
+
+    const resp = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error || `서버 오류 (${resp.status})`);
+    }
+
+    const data = await resp.json();
+    renderAIAnalysisResult(data, student);
+    status.style.display = 'none';
+  } catch (err) {
+    console.error(err);
+    status.className = 'modal-info error';
+    status.textContent = '분석 실패: ' + err.message;
+    result.innerHTML = '';
+  } finally {
+    startBtn.disabled = false;
+  }
+}
+
+function renderAIAnalysisResult(data, student) {
+  const result = document.getElementById('aiAnalysisResult');
+  if (!data || !data.areas) {
+    result.innerHTML = '<p style="color:#c53030;">분석 결과를 받을 수 없습니다.</p>';
+    return;
+  }
+
+  const header = `
+    <div style="font-size:13px;color:#4a5568;margin-bottom:12px;padding:10px;background:#f7fafc;border-radius:6px;">
+      <b>${escapeHTMLForAI(student.name)}</b> · ${student.class}반 ${student.classRank || '-'}등 · 총 ${student.total}점
+    </div>
+  `;
+
+  const cards = (data.areas || []).map(a => {
+    const mastery = a.masteryLevel || '중';
+    const percent = Math.min(100, Math.max(0, Number(a.attainmentPercent) || 0));
+    const stds = (a.standardsEvaluated || []).map(s =>
+      `<span class="ai-std-chip" title="${escapeHTMLForAI(s.note || '')}">[${escapeHTMLForAI(s.code)}] ${escapeHTMLForAI(s.hits || '')}</span>`
+    ).join('');
+    return `
+      <div class="ai-area-card">
+        <div class="ai-area-head">
+          <span class="ai-area-name">${escapeHTMLForAI(a.areaName || '')}</span>
+          <span class="ai-mastery-badge ai-mastery-${mastery}">${mastery}</span>
+          <div class="ai-area-progress"><div class="ai-area-progress-fill" style="width:${percent}%;"></div></div>
+          <span class="ai-area-score">${a.scoredPoints || 0} / ${a.totalPoints || 0}점 (${percent}%)</span>
+        </div>
+        <div class="ai-area-statement">${escapeHTMLForAI(a.statement || '')}</div>
+        ${stds ? `<div class="ai-std-chips">${stds}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+
+  const overall = data.overallNote ? `<div class="ai-overall">📌 <b>종합:</b> ${escapeHTMLForAI(data.overallNote)}</div>` : '';
+
+  result.innerHTML = header + cards + overall;
 }
 
 async function loadSampleItemInfo() {
@@ -2132,6 +2374,7 @@ function activateItemInfoSections() {
   // 학생분석이 이미 표시 중이면 갱신
   const sel = document.getElementById('saStudentSelect');
   if (sel && sel.value) selectStudentForAnalysis();
+  if (typeof updateAIAnalyzeButtonState === 'function') updateAIAnalyzeButtonState();
 }
 
 // ============================================================
