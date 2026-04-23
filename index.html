@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>지필평가 성적 분석 대시보드 도구</title>
+<title>지필고사 성적 분석 프로그램</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -543,7 +543,7 @@ tr:hover{background:#f7fafc;}
 
 <!-- Upload Screen -->
 <div id="uploadScreen">
-  <h1>지필평가 성적 분석 도구</h1>
+  <h1>지필고사 성적 분석 프로그램</h1>
   <p class="subtitle">엑셀 정오표 파일을 업로드하면 자동으로 대시보드를 생성합니다</p>
 
   <div class="drop-zone" id="dropZone">
@@ -586,7 +586,7 @@ tr:hover{background:#f7fafc;}
 <div id="dashboardScreen">
   <div class="header">
     <div class="left">
-      <h1 id="dashTitle">성적 분석 대시보드</h1>
+      <h1 id="dashTitle">지필고사 성적 분석 프로그램</h1>
       <p id="dashSubtitle"></p>
     </div>
     <div class="right">
@@ -1162,8 +1162,7 @@ function renderDashboard(data, examInfo, subjectName) {
   if (typeof updateAIAnalyzeButtonState === 'function') updateAIAnalyzeButtonState();
 
   // Title
-  document.getElementById('dashTitle').textContent =
-    `${examInfo.year} ${examInfo.semester} ${examInfo.examType} 성적 분석`;
+  document.getElementById('dashTitle').textContent = '지필고사 성적 분석 프로그램';
   document.getElementById('dashSubtitle').textContent =
     `${subjectName} | 1학년 전체 (${data.sortedClasses.map(c=>c+'반').join(', ')}) | 총 ${data.overview.total_students}명`;
 
