@@ -1999,7 +1999,7 @@ async function runAIAnalysis() {
 
   status.className = 'modal-info';
   status.style.display = 'block';
-  status.textContent = 'AI가 분석 중입니다... (첫 학생 60~180초, 이후 학생은 캐시로 더 빠름)';
+  status.textContent = 'AI가 분석 중입니다... (첫 학생 30~90초, 이후 학생은 캐시로 더 빠름)';
   const startedAt = Date.now();
   const renderLoading = (stage, textChars, thinkingChars) => {
     const elapsed = Math.floor((Date.now() - startedAt) / 1000);

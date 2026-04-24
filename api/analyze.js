@@ -252,11 +252,11 @@ export default async function handler(req, res) {
 
   try {
     const stream = client.messages.stream({
-      model: 'claude-opus-4-7',
+      model: 'claude-sonnet-4-6',
       max_tokens: 8000,
       thinking: { type: 'adaptive' },
       output_config: {
-        effort: 'high',
+        effort: 'medium',
         format: { type: 'json_schema', schema: JSON_SCHEMA }
       },
       system: SYSTEM_PROMPT,
