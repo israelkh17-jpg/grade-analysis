@@ -253,7 +253,7 @@ export default async function handler(req, res) {
   try {
     const stream = client.messages.stream({
       model: 'claude-opus-4-7',
-      max_tokens: 16000,
+      max_tokens: 8000,
       thinking: { type: 'adaptive' },
       output_config: {
         effort: 'high',
