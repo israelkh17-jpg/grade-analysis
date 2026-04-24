@@ -2306,11 +2306,11 @@ async function parseItemInfoPDF(file) {
     return b.y - a.y;
   });
 
-  // y좌표가 비슷한 항목들을 같은 행으로 그룹화
+  // y좌표가 비슷한 항목들을 같은 행으로 그룹화 (셀 높이 고려 — 2줄 셀에서 중앙 배치된 qNum이 묶이도록 허용)
   const rows = [];
   let cur = null;
   for (const it of allItems) {
-    if (!cur || it.page !== cur.page || Math.abs(it.y - cur.y) > 4) {
+    if (!cur || it.page !== cur.page || Math.abs(it.y - cur.y) > 8) {
       cur = { items: [], y: it.y, page: it.page };
       rows.push(cur);
     }
@@ -2382,71 +2382,28 @@ async function parseItemInfoPDF(file) {
 
     if (qMatch) {
       const qNum = parseInt(qMatch[1]);
-      // 같은 행에서 성취기준 코드 시작("[")을 포함하는 첫 항목의 인덱스
-      let bracketIdx = -1;
-      for (let i = 1; i < row.items.length; i++) {
-        if (row.items[i].str.startsWith('[')) { bracketIdx = i; break; }
-      }
+      if (qNum >= 1 && qNum <= 100) {
+        const rest = row.items.slice(1);
+        // 페이지 푸터 "1 / 2 동북고등학교" 류 필터: qNum 바로 뒤가 "/"이면 스킵
+        if (rest[0] && rest[0].str === '/') continue;
+        // 데이터 행 시그니처: qNum 뒤에 대괄호 또는 ○ 이 있거나, 한글 단어가 1개 이상 있어야 함
+        const hasDataSignature = rest.some(it => {
+          const s = it.str;
+          return s.startsWith('[') || s === '○' || /[가-힣]/.test(s);
+        });
 
-      if (qNum >= 1 && qNum <= 100 && bracketIdx >= 2) {
-        // 내용영역: item[1] ~ item[bracketIdx-1] 중 한글 단어들
-        const areaParts = [];
-        for (let i = 1; i < bracketIdx; i++) {
-          const s = row.items[i].str;
-          if (s === '○') continue;
-          if (/^\d+(?:\.\d+)?$/.test(s)) continue; // 숫자 스킵
-          if (/[가-힣]/.test(s) || /[A-Za-zⅠ-Ⅻ]/.test(s)) areaParts.push(s);
+        if (hasDataSignature) {
+          pushCurrent();
+          const adjQ = serdapMode ? qNum + lastSelectiveQ : qNum;
+          currentItem = {
+            q: adjQ, area: '', standardText: '', standardCode: '',
+            level: detectLevel(row.items) || '', point: 0, answer: '',
+            isEssay: serdapMode
+          };
+          // 같은 행 항목들을 영역/성취기준/배점/정답으로 분배
+          assignRowItems(rest, currentItem);
+          continue;
         }
-        const area = areaParts.join(' ').trim();
-        if (!area) continue;
-
-        pushCurrent();
-        const adjQ = serdapMode ? qNum + lastSelectiveQ : qNum;
-        currentItem = {
-          q: adjQ, area, standardText: '', standardCode: '',
-          level: detectLevel(row.items) || '', point: 0, answer: '',
-          isEssay: serdapMode
-        };
-
-        // bracketIdx 이후: 성취기준 텍스트 + 난이도(○) + 배점 + 정답
-        for (let i = bracketIdx; i < row.items.length; i++) {
-          const s = row.items[i].str;
-          if (s === '○') continue;
-          // "별지 참조" / "별지참조"
-          if (/별지|참조/.test(s)) {
-            currentItem.answer = currentItem.answer ? `${currentItem.answer} ${s}` : s;
-            continue;
-          }
-          // 성취기준 텍스트 (대괄호 시작 또는 한글 포함)
-          if (s.startsWith('[') || /[가-힣]/.test(s)) {
-            currentItem.standardText += ' ' + s;
-            continue;
-          }
-          // 배점 (소수 또는 정수)
-          if (/^\d+\.\d+$/.test(s) && currentItem.point === 0) {
-            currentItem.point = parseFloat(s);
-            continue;
-          }
-          if (/^\d+$/.test(s)) {
-            const n = parseInt(s);
-            // 객관식 정답: 1~5 한 자리
-            if (!currentItem.answer && n >= 1 && n <= 5) {
-              currentItem.answer = s;
-              continue;
-            }
-            // 서답형 배점: 정수 (보통 5~30)
-            if (serdapMode && currentItem.point === 0 && n >= 1 && n <= 30) {
-              currentItem.point = n;
-              continue;
-            }
-            // 객관식 정수 배점 (예: 4점)
-            if (!serdapMode && currentItem.point === 0 && n >= 1 && n <= 10) {
-              currentItem.point = n;
-              continue;
-            }
-          }
-        }
-        continue;
       }
     }
 
@@ -2454,34 +2411,50 @@ async function parseItemInfoPDF(file) {
     if (currentItem) {
       const lv = detectLevel(row.items);
       if (lv && !currentItem.level) currentItem.level = lv;
-
-      for (const it of row.items) {
-        const s = it.str;
-        if (s === '○') continue;
-        if (/별지|참조/.test(s)) {
-          currentItem.answer = currentItem.answer ? `${currentItem.answer} ${s}` : s;
-          continue;
-        }
-        if (/[가-힣]/.test(s) || s.startsWith('[') || s.endsWith(']')) {
-          currentItem.standardText += ' ' + s;
-          continue;
-        }
-        if (/^\d+\.\d+$/.test(s) && currentItem.point === 0) {
-          currentItem.point = parseFloat(s);
-          continue;
-        }
-        if (/^[1-5]$/.test(s) && !currentItem.answer) {
-          currentItem.answer = s;
-          continue;
-        }
-        if (serdapMode && /^\d+$/.test(s)) {
-          const n = parseInt(s);
-          if (currentItem.point === 0 && n >= 1 && n <= 30) { currentItem.point = n; continue; }
-        }
-      }
+      assignRowItems(row.items, currentItem);
     }
   }
   pushCurrent();
+
+  // 한 행의 항목들을 currentItem의 area/standardText/point/answer로 분배
+  function assignRowItems(rowItems, item) {
+    for (const it of rowItems) {
+      const s = it.str;
+      if (!s || s === '○') continue;
+      // 별지 참조
+      if (/별지|참조/.test(s)) {
+        item.answer = item.answer ? `${item.answer} ${s}` : s;
+        continue;
+      }
+      // 대괄호로 시작하는 성취기준 코드 또는 한글 텍스트
+      const hasKorean = /[가-힣A-Za-zⅠ-Ⅻ]/.test(s);
+      if (s.startsWith('[') || s.endsWith(']')) {
+        item.standardText += ' ' + s;
+        continue;
+      }
+      if (hasKorean) {
+        // 성취기준 본문이 아직 비었고 영역에 적재 여지 있으면 영역으로
+        if (!item.standardText.trim() && !/^\s*\[/.test(s)) {
+          item.area = (item.area ? item.area + ' ' : '') + s;
+        } else {
+          item.standardText += ' ' + s;
+        }
+        continue;
+      }
+      // 배점 (소수)
+      if (/^\d+\.\d+$/.test(s) && item.point === 0) {
+        item.point = parseFloat(s);
+        continue;
+      }
+      // 정수: 정답 또는 배점
+      if (/^\d+$/.test(s)) {
+        const n = parseInt(s);
+        if (!item.answer && n >= 1 && n <= 5) { item.answer = s; continue; }
+        if (item.isEssay && item.point === 0 && n >= 1 && n <= 30) { item.point = n; continue; }
+        if (!item.isEssay && item.point === 0 && n >= 1 && n <= 10) { item.point = n; continue; }
+      }
+    }
+  }
 
   if (items.length === 0) throw new Error('PDF에서 문항 데이터를 추출할 수 없습니다. 형식을 확인하세요.');
 
