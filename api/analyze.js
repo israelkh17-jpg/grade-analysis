@@ -225,11 +225,32 @@ export default async function handler(req, res) {
     return;
   }
 
+  // ── SSE 모드로 응답 ─────────────────────────────────────────────
+  // 긴 생성(>60s)에도 중간 프록시가 끊지 않도록, Anthropic 스트림 이벤트마다
+  // progress 이벤트를 내려보내 커넥션을 유지하고, 마지막에 result 이벤트로 JSON 전송.
+  res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // nginx/edge 버퍼링 차단
+  if (typeof res.flushHeaders === 'function') res.flushHeaders();
+
+  const send = (event, data) => {
+    try {
+      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    } catch (_) { /* 연결 끊김 무시 */ }
+  };
+
+  // 15s 하트비트: 이벤트 공백이 길 때도 커넥션 유지
+  const heartbeat = setInterval(() => {
+    try { res.write(': ping\n\n'); } catch (_) {}
+  }, 15000);
+
+  send('progress', { stage: 'start', message: 'AI 분석 시작' });
+
   const client = new Anthropic({ apiKey });
   const userText = buildUserPrompt(itemInfo, student);
 
   try {
-    // 스트리밍으로 호출하여 SDK HTTP 타임아웃 회피 (adaptive thinking + PDF는 30s+ 가능)
     const stream = client.messages.stream({
       model: 'claude-opus-4-7',
       max_tokens: 16000,
@@ -250,8 +271,7 @@ export default async function handler(req, res) {
                 media_type: 'application/pdf',
                 data: testPaperPdf
               },
-              // PDF 블록에 캐시 breakpoint → 같은 시험 여러 학생 분석 시
-              // 시스템 프롬프트 + PDF가 캐시되어 이후 요청은 ~0.1배 비용
+              // 같은 시험 여러 학생 분석 시 시스템+PDF가 캐싱되어 이후 요청은 저비용
               cache_control: { type: 'ephemeral' }
             },
             { type: 'text', text: userText }
@@ -260,12 +280,39 @@ export default async function handler(req, res) {
       ]
     });
 
+    // 스트림 이벤트 순회 — 진행 상황 주기 전송
+    let textChars = 0;
+    let thinkingChars = 0;
+    let lastSentAt = Date.now();
+    const maybeSend = (stage) => {
+      const now = Date.now();
+      if (now - lastSentAt < 800) return;
+      lastSentAt = now;
+      send('progress', { stage, textChars, thinkingChars });
+    };
+
+    for await (const event of stream) {
+      if (event.type === 'content_block_delta') {
+        const d = event.delta || {};
+        if (d.type === 'thinking_delta') {
+          thinkingChars += (d.thinking || '').length;
+          maybeSend('thinking');
+        } else if (d.type === 'text_delta') {
+          textChars += (d.text || '').length;
+          maybeSend('writing');
+        }
+      } else if (event.type === 'content_block_start') {
+        const bt = event.content_block?.type;
+        if (bt === 'thinking') send('progress', { stage: 'thinking', textChars, thinkingChars });
+        else if (bt === 'text') send('progress', { stage: 'writing', textChars, thinkingChars });
+      }
+    }
+
     const message = await stream.finalMessage();
 
-    // JSON 추출 (output_config.format으로 첫 text 블록이 유효한 JSON임이 보장됨)
     const textBlock = message.content.find(b => b.type === 'text');
     if (!textBlock) {
-      res.status(500).json({ error: 'AI 응답에서 텍스트 블록을 찾지 못했습니다.' });
+      send('error', { error: 'AI 응답에서 텍스트 블록을 찾지 못했습니다.' });
       return;
     }
 
@@ -273,14 +320,10 @@ export default async function handler(req, res) {
     try {
       parsed = JSON.parse(textBlock.text);
     } catch (e) {
-      res.status(500).json({
-        error: 'AI 응답을 JSON으로 파싱할 수 없습니다.',
-        raw: textBlock.text.slice(0, 500)
-      });
+      send('error', { error: 'AI 응답을 JSON으로 파싱할 수 없습니다.', raw: textBlock.text.slice(0, 500) });
       return;
     }
 
-    // (선택적) 캐시 히트 로깅 — Vercel 로그에서 확인 가능
     const usage = message.usage || {};
     console.log('[analyze] tokens:',
       'in=' + (usage.input_tokens || 0),
@@ -289,23 +332,17 @@ export default async function handler(req, res) {
       'cache_write=' + (usage.cache_creation_input_tokens || 0)
     );
 
-    res.status(200).json(parsed);
-
+    send('result', parsed);
   } catch (error) {
     console.error('Analyze error:', error);
-
-    // SDK의 타입드 예외 사용
-    if (error instanceof Anthropic.RateLimitError) {
-      res.status(429).json({ error: 'API 호출 한도 초과. 잠시 후 다시 시도해주세요.' });
-    } else if (error instanceof Anthropic.AuthenticationError) {
-      res.status(500).json({ error: 'ANTHROPIC_API_KEY가 올바르지 않습니다.' });
-    } else if (error instanceof Anthropic.APIError) {
-      res.status(error.status || 500).json({
-        error: `Claude API 오류 (${error.status}): ${error.message || ''}`
-      });
-    } else {
-      res.status(500).json({ error: error.message || '서버 내부 오류' });
-    }
+    let msg = error.message || '서버 내부 오류';
+    if (error instanceof Anthropic.RateLimitError) msg = 'API 호출 한도 초과. 잠시 후 다시 시도해주세요.';
+    else if (error instanceof Anthropic.AuthenticationError) msg = 'ANTHROPIC_API_KEY가 올바르지 않습니다.';
+    else if (error instanceof Anthropic.APIError) msg = `Claude API 오류 (${error.status}): ${error.message || ''}`;
+    send('error', { error: msg });
+  } finally {
+    clearInterval(heartbeat);
+    try { res.end(); } catch (_) {}
   }
 }
 

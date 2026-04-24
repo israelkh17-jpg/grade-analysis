@@ -1967,9 +1967,28 @@ async function runAIAnalysis() {
 
   status.className = 'modal-info';
   status.style.display = 'block';
-  status.textContent = 'AI가 분석 중입니다... (약 10~20초 소요)';
-  result.innerHTML = '<div class="ai-loading"><div class="ai-spinner"></div>성취기준 코드 기반 진술문 생성 중...</div>';
+  status.textContent = 'AI가 분석 중입니다... (보통 30~90초 소요)';
+  const startedAt = Date.now();
+  const renderLoading = (stage, textChars, thinkingChars) => {
+    const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+    const stageLabel = {
+      start: '분석 준비',
+      thinking: '추론 중',
+      writing: '진술문 작성 중'
+    }[stage] || stage;
+    const detail = [];
+    if (thinkingChars) detail.push(`추론 ${thinkingChars.toLocaleString()}자`);
+    if (textChars) detail.push(`작성 ${textChars.toLocaleString()}자`);
+    const detailTxt = detail.length ? ` · ${detail.join(' · ')}` : '';
+    result.innerHTML = `<div class="ai-loading"><div class="ai-spinner"></div>
+      ${stageLabel} (${elapsed}s${detailTxt})</div>`;
+  };
+  renderLoading('start', 0, 0);
   startBtn.disabled = true;
+
+  // 초마다 경과시간 갱신 (스트림 이벤트가 뜸할 때도 살아있음을 표시)
+  let lastStage = 'start', lastText = 0, lastThink = 0;
+  const tick = setInterval(() => renderLoading(lastStage, lastText, lastThink), 1000);
 
   try {
     // 학생 응답 배열 구성 (문항번호 매핑)
@@ -1997,6 +2016,7 @@ async function runAIAnalysis() {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'text/event-stream',
         'X-Admin-Code': getAdminCode() || ''
       },
       body: JSON.stringify(body)
@@ -2016,12 +2036,55 @@ async function runAIAnalysis() {
     }
 
     if (!resp.ok) {
-      const err = await resp.json().catch(() => ({}));
-      throw new Error(err.error || `서버 오류 (${resp.status})`);
+      const errText = await resp.text().catch(() => '');
+      let errMsg = `서버 오류 (${resp.status})`;
+      try { const j = JSON.parse(errText); if (j.error) errMsg = j.error; } catch (_) {}
+      throw new Error(errMsg);
     }
 
-    const data = await resp.json();
-    renderAIAnalysisResult(data, student);
+    // SSE 스트림 파싱
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+    let finalData = null;
+    let streamError = null;
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      // SSE 메시지는 \n\n 로 구분
+      let idx;
+      while ((idx = buffer.indexOf('\n\n')) >= 0) {
+        const raw = buffer.slice(0, idx);
+        buffer = buffer.slice(idx + 2);
+        if (!raw || raw.startsWith(':')) continue; // 주석/하트비트
+        let evName = 'message', dataStr = '';
+        for (const line of raw.split('\n')) {
+          if (line.startsWith('event:')) evName = line.slice(6).trim();
+          else if (line.startsWith('data:')) dataStr += line.slice(5).trimStart();
+        }
+        if (!dataStr) continue;
+        let payload;
+        try { payload = JSON.parse(dataStr); } catch (_) { continue; }
+        if (evName === 'progress') {
+          lastStage = payload.stage || lastStage;
+          lastText = payload.textChars || lastText;
+          lastThink = payload.thinkingChars || lastThink;
+          renderLoading(lastStage, lastText, lastThink);
+        } else if (evName === 'result') {
+          finalData = payload;
+        } else if (evName === 'error') {
+          streamError = payload.error || 'AI 분석 오류';
+        }
+      }
+    }
+
+    if (streamError) throw new Error(streamError);
+    if (!finalData) throw new Error('분석 결과를 받지 못했습니다. 네트워크 또는 서버 타임아웃을 확인해주세요.');
+
+    renderAIAnalysisResult(finalData, student);
     status.style.display = 'none';
   } catch (err) {
     console.error(err);
@@ -2029,6 +2092,7 @@ async function runAIAnalysis() {
     status.textContent = '분석 실패: ' + err.message;
     result.innerHTML = '';
   } finally {
+    clearInterval(tick);
     startBtn.disabled = false;
   }
 }
