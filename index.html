@@ -1612,6 +1612,7 @@ function goBack() {
   });
   // Reset iteminfo sections
   document.querySelectorAll('.iteminfo-section').forEach(s => s.classList.remove('activated'));
+  if (typeof updateItemInfoButtonState === 'function') updateItemInfoButtonState();
 }
 
 // ============================================================
@@ -1829,6 +1830,23 @@ function updateTestPaperButtonState() {
     btn.style.borderColor = '#86efac';
   } else {
     btn.innerHTML = '📄 출제원안지 등록';
+    btn.style.background = '';
+    btn.style.color = '';
+    btn.style.borderColor = '';
+  }
+  updateAIAnalyzeButtonState();
+}
+
+function updateItemInfoButtonState() {
+  const btn = document.getElementById('btnRegisterItemInfo');
+  if (!btn) return;
+  if (ITEM_INFO && ITEM_INFO.length > 0) {
+    btn.innerHTML = '✓ 문항정보 등록됨';
+    btn.style.background = '#dcfce7';
+    btn.style.color = '#166534';
+    btn.style.borderColor = '#86efac';
+  } else {
+    btn.innerHTML = '📋 문항정보 등록';
     btn.style.background = '';
     btn.style.color = '';
     btn.style.borderColor = '';
@@ -2414,6 +2432,7 @@ function activateItemInfoSections() {
   // 학생분석이 이미 표시 중이면 갱신
   const sel = document.getElementById('saStudentSelect');
   if (sel && sel.value) selectStudentForAnalysis();
+  if (typeof updateItemInfoButtonState === 'function') updateItemInfoButtonState();
   if (typeof updateAIAnalyzeButtonState === 'function') updateAIAnalyzeButtonState();
 }
 
