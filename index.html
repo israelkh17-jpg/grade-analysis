@@ -2325,30 +2325,18 @@ async function parseItemInfoPDF(file) {
   let serdapMode = false;
   let lastSelectiveQ = 0;
 
-  const knownAreas = ['과학의 기초', '물질과 규칙성', '시스템과 상호작용'];
-
-  function findArea(rowItems) {
-    const text = rowItems.map(i => i.str).join(' ');
-    for (const a of knownAreas) {
-      if (text.includes(a)) return a;
-      // 띄어쓰기 변형 처리
-      if (text.replace(/\s/g, '').includes(a.replace(/\s/g, ''))) return a;
-    }
-    return null;
-  }
-
   function detectLevel(rowItems) {
-    // ○ 위치로 난이도 결정
+    // ○ 위치로 난이도 결정 — 난이도 열 근처(30 단위 이내)에 있는 것만
     for (const it of rowItems) {
-      if (it.str === '○') {
-        const dE = Math.abs(it.x - eoX);
-        const dB = Math.abs(it.x - boX);
-        const dS = Math.abs(it.x - swX);
-        const m = Math.min(dE, dB, dS);
-        if (dE === m) return '어려움';
-        if (dB === m) return '보통';
-        return '쉬움';
-      }
+      if (it.str !== '○') continue;
+      const dE = Math.abs(it.x - eoX);
+      const dB = Math.abs(it.x - boX);
+      const dS = Math.abs(it.x - swX);
+      const m = Math.min(dE, dB, dS);
+      if (m > 30) continue;
+      if (dE === m) return '어려움';
+      if (dB === m) return '보통';
+      return '쉬움';
     }
     return null;
   }
@@ -2368,6 +2356,9 @@ async function parseItemInfoPDF(file) {
     currentItem = null;
   }
 
+  // 요약/잡음 행 판별
+  const SKIP_ROW_MARKERS = ['총합계', '비율(', '비율 (', '고사일시', '공동출제자', '총 문항수', '과목 코드', '문항 정보'];
+
   for (const row of rows) {
     const rowText = row.items.map(i => i.str).join(' ');
 
@@ -2379,54 +2370,81 @@ async function parseItemInfoPDF(file) {
       continue;
     }
 
-    // 첫 번째 항목이 숫자인지 확인 (문항 시작)
+    // 요약/헤더 행 스킵
+    if (SKIP_ROW_MARKERS.some(m => rowText.includes(m))) {
+      pushCurrent();
+      continue;
+    }
+
+    // 첫 번째 항목이 순수 숫자인지 확인 (문항 시작)
     const first = row.items[0];
     if (!first) continue;
     const qMatch = first.str.match(/^(\d+)$/);
 
     if (qMatch) {
       const qNum = parseInt(qMatch[1]);
-      // 합리적인 문항 번호 범위 (1-50) 인지, 그리고 영역이 같은 행에 있는지 확인
-      const area = findArea(row.items);
-      if (qNum >= 1 && qNum <= 50 && area) {
+      // 같은 행에서 성취기준 코드 시작("[")을 포함하는 첫 항목의 인덱스
+      let bracketIdx = -1;
+      for (let i = 1; i < row.items.length; i++) {
+        if (row.items[i].str.startsWith('[')) { bracketIdx = i; break; }
+      }
+
+      if (qNum >= 1 && qNum <= 100 && bracketIdx >= 2) {
+        // 내용영역: item[1] ~ item[bracketIdx-1] 중 한글 단어들
+        const areaParts = [];
+        for (let i = 1; i < bracketIdx; i++) {
+          const s = row.items[i].str;
+          if (s === '○') continue;
+          if (/^\d+(?:\.\d+)?$/.test(s)) continue; // 숫자 스킵
+          if (/[가-힣]/.test(s) || /[A-Za-zⅠ-Ⅻ]/.test(s)) areaParts.push(s);
+        }
+        const area = areaParts.join(' ').trim();
+        if (!area) continue;
+
         pushCurrent();
         const adjQ = serdapMode ? qNum + lastSelectiveQ : qNum;
         currentItem = {
-          q: adjQ,
-          area: area,
-          standardText: '',
-          standardCode: '',
-          level: detectLevel(row.items) || '',
-          point: 0,
-          answer: '',
+          q: adjQ, area, standardText: '', standardCode: '',
+          level: detectLevel(row.items) || '', point: 0, answer: '',
           isEssay: serdapMode
         };
 
-        // 같은 행의 나머지 데이터 처리 (성취기준, 배점, 정답)
-        for (const it of row.items) {
-          const s = it.str;
-          if (s === first.str || s === area || s === '○') continue;
-          if (knownAreas.some(a => s.includes(a) || a.includes(s))) continue;
-
-          // 성취기준 텍스트
+        // bracketIdx 이후: 성취기준 텍스트 + 난이도(○) + 배점 + 정답
+        for (let i = bracketIdx; i < row.items.length; i++) {
+          const s = row.items[i].str;
+          if (s === '○') continue;
+          // "별지 참조" / "별지참조"
+          if (/별지|참조/.test(s)) {
+            currentItem.answer = currentItem.answer ? `${currentItem.answer} ${s}` : s;
+            continue;
+          }
+          // 성취기준 텍스트 (대괄호 시작 또는 한글 포함)
           if (s.startsWith('[') || /[가-힣]/.test(s)) {
             currentItem.standardText += ' ' + s;
             continue;
           }
-          // 배점 (소수)
+          // 배점 (소수 또는 정수)
           if (/^\d+\.\d+$/.test(s) && currentItem.point === 0) {
             currentItem.point = parseFloat(s);
             continue;
           }
-          // 서답형 배점 (정수 5)
-          if (serdapMode && /^\d+$/.test(s) && parseInt(s) >= 1 && parseInt(s) <= 20 && currentItem.point === 0) {
-            currentItem.point = parseInt(s);
-            continue;
-          }
-          // 정답 (한 자리 숫자, 또는 "별지 참조")
-          if (/^[1-5]$/.test(s) && !currentItem.answer) {
-            currentItem.answer = s;
-            continue;
+          if (/^\d+$/.test(s)) {
+            const n = parseInt(s);
+            // 객관식 정답: 1~5 한 자리
+            if (!currentItem.answer && n >= 1 && n <= 5) {
+              currentItem.answer = s;
+              continue;
+            }
+            // 서답형 배점: 정수 (보통 5~30)
+            if (serdapMode && currentItem.point === 0 && n >= 1 && n <= 30) {
+              currentItem.point = n;
+              continue;
+            }
+            // 객관식 정수 배점 (예: 4점)
+            if (!serdapMode && currentItem.point === 0 && n >= 1 && n <= 10) {
+              currentItem.point = n;
+              continue;
+            }
           }
         }
         continue;
@@ -2435,30 +2453,31 @@ async function parseItemInfoPDF(file) {
 
     // 이전 문항의 연속 행 (성취기준 wrap, 또는 난이도/배점/정답이 다음 행에 있을 때)
     if (currentItem) {
-      // 난이도 감지
       const lv = detectLevel(row.items);
       if (lv && !currentItem.level) currentItem.level = lv;
 
       for (const it of row.items) {
         const s = it.str;
         if (s === '○') continue;
-
-        // 성취기준 연속 텍스트
+        if (/별지|참조/.test(s)) {
+          currentItem.answer = currentItem.answer ? `${currentItem.answer} ${s}` : s;
+          continue;
+        }
         if (/[가-힣]/.test(s) || s.startsWith('[') || s.endsWith(']')) {
-          // 영역 표시는 무시
-          if (knownAreas.some(a => s.includes(a) || a === s)) continue;
           currentItem.standardText += ' ' + s;
           continue;
         }
-        // 배점 (소수)
         if (/^\d+\.\d+$/.test(s) && currentItem.point === 0) {
           currentItem.point = parseFloat(s);
           continue;
         }
-        // 정답
         if (/^[1-5]$/.test(s) && !currentItem.answer) {
           currentItem.answer = s;
           continue;
+        }
+        if (serdapMode && /^\d+$/.test(s)) {
+          const n = parseInt(s);
+          if (currentItem.point === 0 && n >= 1 && n <= 30) { currentItem.point = n; continue; }
         }
       }
     }
