@@ -28,19 +28,19 @@ const SYSTEM_PROMPT = `너는 고등학교 과학 평가 분석 전문가다.
 추상 표현("상/중/하 수준", "이해가 안정적", "보완 필요" 등) 단독 사용 금지.
 등급 라벨(A/B/C/D/E, 상/중/하)은 statement 본문에 노출 금지 (masteryLevel 필드에만 기록).
 
-[영역별 statement — 2~3문장, 각 250~350자 범위]
+[영역별 statement — 2문장, 각 **최대 300자**]
 ① 역량 진술: 성취기준의 핵심 개념·행위 동사를 풀어 "~할 수 있다"로 인정.
    (예: "세포 내 정보가 DNA에 유전자로 저장되어 있음을 인식하고, 전사·번역을 통해 단백질이 생성되는 흐름을 설명할 수 있다.")
-② (오답 있을 때) 한계: 어느 문항에서 어떤 개념의 연결이 미완결인지 "~하는 데에는 이르지 못하였다" 형태로.
-   (예: "다만 7번 문항에서 조절 유전자 사례의 연결은 완결적으로 기술하는 데에는 이르지 못하였다.")
+② (오답 있을 때만) 한계 한 문장: 어느 문항에서 어떤 개념의 연결이 미완결인지.
+   (예: "다만 7번 문항에서 조절 유전자 사례의 연결은 기술하는 데에는 이르지 못하였다.")
 
-[총 분량 가이드] 모든 영역 statement를 합쳐 **1000~1500자** 범위에 맞춘다. 과도한 부연 금지.
+[엄격 상한] 모든 영역 statement 합계 **절대 1500자를 넘기지 말 것**. 1200자 이하 권장. 부연·반복 금지.
 
 [masteryLevel 판정] 배점 대비 득점률 — 상 80%+ / 중 50~79% / 하 50% 미만.
 
-[standardsEvaluated[].note] 한 줄, 25자 내외. 구체 역량 키워드로(예: "DNA→단백질 흐름 주요 단계 기술").
+[standardsEvaluated[].note] 한 줄 **최대 25자**. 구체 역량 키워드(예: "DNA→단백질 흐름 주요 단계 기술").
 
-[overallNote] 1문장, 80자 이내.
+[overallNote] 1문장, **최대 80자**.
 
 반드시 JSON 스키마를 정확히 따른다(추가 필드 금지, 누락 금지).`;
 
@@ -126,9 +126,9 @@ function buildUserPrompt(itemInfo, student) {
 
   lines.push('');
   lines.push('[요구사항] 위 자료를 근거로 영역별 성취수준을 JSON 스키마에 맞춰 분석하라.');
-  lines.push('- statement: 영역당 2~3문장, 각 250~350자. 성취기준의 행위 동사("설명할 수 있다" 등)를 재사용한 평가기준 A~E 스타일 구체 역량 문장.');
-  lines.push('- 오답은 "이르지 못하였다" 류 행동 기반 표현. "상/중/하/A~E" 라벨은 본문에 노출 금지(masteryLevel 필드에만 기록).');
-  lines.push('- 모든 영역 statement 합계는 1000~1500자 범위에 맞출 것. 과도한 부연 금지.');
+  lines.push('- statement: 영역당 2문장, 각 **최대 300자**. 성취기준의 행위 동사를 재사용한 "~할 수 있다" 스타일.');
+  lines.push('- 오답은 "이르지 못하였다" 류 표현. "상/중/하/A~E" 라벨은 본문에 금지(masteryLevel 필드에만).');
+  lines.push('- **모든 statement 합계 1500자 절대 초과 금지, 1200자 이하 권장**. 부연·반복 금지.');
 
   return lines.join('\n');
 }
@@ -200,8 +200,7 @@ export default async function handler(req, res) {
   try {
     const stream = client.messages.stream({
       model: 'claude-sonnet-4-6',
-      max_tokens: 3000,
-      thinking: { type: 'enabled', budget_tokens: 1024 },
+      max_tokens: 2500,
       output_config: {
         effort: 'medium',
         format: { type: 'json_schema', schema: JSON_SCHEMA }
@@ -257,17 +256,37 @@ export default async function handler(req, res) {
 
     const message = await stream.finalMessage();
 
-    const textBlock = message.content.find(b => b.type === 'text');
-    if (!textBlock) {
-      send('error', { error: 'AI 응답에서 텍스트 블록을 찾지 못했습니다.' });
+    // 텍스트 추출 — text 블록 우선, 없으면 모든 블록의 text/json 속성에서 수집
+    let rawText = '';
+    for (const b of (message.content || [])) {
+      if (b.type === 'text' && typeof b.text === 'string') { rawText = b.text; break; }
+    }
+    if (!rawText) {
+      for (const b of (message.content || [])) {
+        if (typeof b.text === 'string' && b.text.trim()) { rawText = b.text; break; }
+        if (typeof b.json === 'string' && b.json.trim()) { rawText = b.json; break; }
+        if (b.json && typeof b.json === 'object') { rawText = JSON.stringify(b.json); break; }
+      }
+    }
+    if (!rawText) {
+      console.error('[analyze] no text in content:', JSON.stringify(message.content).slice(0, 500));
+      send('error', { error: 'AI 응답 형식이 예상과 달라 파싱할 수 없습니다. (model/config 점검 필요)' });
       return;
     }
 
+    // 혹시 코드펜스 또는 앞뒤 잡음이 있으면 JSON 덩어리만 추출
+    let jsonText = rawText.trim();
+    const fence = jsonText.match(/```(?:json)?\s*([\s\S]*?)```/i);
+    if (fence) jsonText = fence[1].trim();
+    const firstBrace = jsonText.indexOf('{');
+    const lastBrace = jsonText.lastIndexOf('}');
+    if (firstBrace >= 0 && lastBrace > firstBrace) jsonText = jsonText.slice(firstBrace, lastBrace + 1);
+
     let parsed;
     try {
-      parsed = JSON.parse(textBlock.text);
+      parsed = JSON.parse(jsonText);
     } catch (e) {
-      send('error', { error: 'AI 응답을 JSON으로 파싱할 수 없습니다.', raw: textBlock.text.slice(0, 500) });
+      send('error', { error: 'AI 응답을 JSON으로 파싱할 수 없습니다.', raw: rawText.slice(0, 500) });
       return;
     }
 
