@@ -97,6 +97,16 @@ body{font-family:'Pretendard','Apple SD Gothic Neo','Noto Sans KR',sans-serif;ba
 }
 
 /* 안내 모달 - 단계별 가이드 */
+.help-step{display:flex;gap:14px;align-items:flex-start;padding:14px;margin-bottom:12px;background:linear-gradient(180deg,#f7fafc 0%,#edf2f7 100%);border-radius:10px;border:1px solid #e2e8f0;transition:all 0.2s;}
+.help-step:last-child{margin-bottom:0;}
+.help-step:hover{transform:translateX(2px);border-color:#cbd5e0;box-shadow:0 2px 8px rgba(0,0,0,0.06);}
+.help-step-warn{background:linear-gradient(180deg,#fffbeb 0%,#fef3c7 100%);border-color:#fcd34d;}
+.help-num{flex-shrink:0;width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#2d6a9f,#1e3a5f);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;box-shadow:0 2px 6px rgba(45,106,159,0.3);}
+.help-content{flex:1;min-width:0;}
+.help-content h3{font-size:14px;color:#1e3a5f;margin:0 0 6px 0;font-weight:700;}
+.help-content p{font-size:13px;color:#4a5568;margin:0 0 4px 0;line-height:1.6;}
+.help-content .help-sub{font-size:12px;color:#718096;background:rgba(255,255,255,0.7);padding:6px 10px;border-radius:6px;margin-top:6px;border-left:3px solid #2d6a9f;}
+.help-step-warn .help-content .help-sub{border-left-color:#f59e0b;}
 .guide-step{display:flex;gap:14px;margin-bottom:22px;padding-bottom:18px;border-bottom:1px dashed #e2e8f0;}
 .guide-step:last-child{border-bottom:none;margin-bottom:0;}
 .guide-step-num{
@@ -137,6 +147,8 @@ body{font-family:'Pretendard','Apple SD Gothic Neo','Noto Sans KR',sans-serif;ba
 .header .right{display:flex;gap:8px;}
 .btn-back,.btn-print{padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.1);color:#fff;transition:all 0.2s;}
 .btn-back:hover,.btn-print:hover{background:rgba(255,255,255,0.25);}
+.btn-help{background:linear-gradient(135deg,#fbbf24,#f59e0b);border-color:#fbbf24;color:#1e3a5f;font-weight:700;box-shadow:0 2px 6px rgba(245,158,11,0.35);}
+.btn-help:hover{background:linear-gradient(135deg,#fde68a,#fbbf24);transform:translateY(-1px);box-shadow:0 4px 10px rgba(245,158,11,0.5);}
 .container{max-width:1280px;margin:0 auto;padding:20px;}
 
 .kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:14px;margin-bottom:24px;}
@@ -502,6 +514,56 @@ tr:hover{background:#f7fafc;}
   </div>
 </div>
 
+<!-- 사용안내 모달 -->
+<div class="modal-overlay" id="helpModal">
+  <div class="modal-box" style="max-width:640px;">
+    <div class="modal-header" style="background:linear-gradient(135deg,#2d6a9f 0%,#38a169 100%);color:#fff;border-radius:14px 14px 0 0;">
+      <h2 style="color:#fff;">💡 사용안내</h2>
+      <button class="modal-close" onclick="closeHelpModal()" style="color:#fff;">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div class="help-step">
+        <div class="help-num">1</div>
+        <div class="help-content">
+          <h3>나이스에서 문항정보표(PDF) 다운로드</h3>
+          <p>NEIS에서 <b>문항정보표 PDF</b>를 다운받아 사용하세요.</p>
+          <p class="help-sub">📌 준비물: <b>문항정보표</b> + <b>출제원안지</b></p>
+        </div>
+      </div>
+
+      <div class="help-step">
+        <div class="help-num">2</div>
+        <div class="help-content">
+          <h3>샘플 데이터로 분석 예시 보기</h3>
+          <p>샘플 데이터를 선택하면 분석 예시를 확인하실 수 있습니다.</p>
+          <p class="help-sub">📌 1학기 중간 ○○고의 자료입니다. <b>가명 처리</b>되었으니 안심하셔도 됩니다.</p>
+        </div>
+      </div>
+
+      <div class="help-step">
+        <div class="help-num">3</div>
+        <div class="help-content">
+          <h3>본인 자료를 직접 업로드</h3>
+          <p>대시보드 상단의 <b>"📄 출제원안지 등록"</b>, <b>"📋 문항정보 등록"</b>에서 직접 자료를 업로드하시면 분석 결과를 더 정밀하게 확인하실 수 있습니다.</p>
+          <p class="help-sub">📌 샘플 데이터를 그대로 사용하셔도 괜찮습니다.</p>
+        </div>
+      </div>
+
+      <div class="help-step help-step-warn">
+        <div class="help-num" style="background:#f59e0b;">!</div>
+        <div class="help-content">
+          <h3>AI 성취수준 분석은 조금만 사용해 주세요</h3>
+          <p>AI 분석은 호출 시마다 <b>비용이 발생</b>합니다. 꼭 필요한 학생 위주로 사용해 주세요. 🙏</p>
+          <p class="help-sub">📌 첫 학생 분석 후 5분 이내 같은 시험으로 다른 학생을 분석하면 캐시로 더 저렴해집니다.</p>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-modal btn-modal-primary" onclick="closeHelpModal()">확인</button>
+    </div>
+  </div>
+</div>
+
 <!-- 출제원안지 등록 모달 -->
 <div class="modal-overlay" id="testPaperModal">
   <div class="modal-box">
@@ -590,6 +652,7 @@ tr:hover{background:#f7fafc;}
       <p id="dashSubtitle"></p>
     </div>
     <div class="right">
+      <button class="btn-back btn-help" onclick="openHelpModal()" title="이 프로그램 사용 방법 안내">❓ 사용안내</button>
       <button class="btn-back" id="btnRegisterTestPaper" onclick="openTestPaperModal()">📄 출제원안지 등록</button>
       <button class="btn-back" id="btnRegisterItemInfo" onclick="openItemInfoModal()">📋 문항정보 등록</button>
       <button class="btn-back" id="btnAIAnalyze" onclick="openAIAnalysisModal()" disabled title="출제원안지·문항정보·학생 성적이 모두 등록되어야 활성화됩니다">🤖 AI 성취수준 분석</button>
@@ -1661,6 +1724,13 @@ function openDownloadGuide() {
 
 function closeDownloadGuide() {
   document.getElementById('downloadGuideModal').classList.remove('show');
+}
+
+function openHelpModal() {
+  document.getElementById('helpModal').classList.add('show');
+}
+function closeHelpModal() {
+  document.getElementById('helpModal').classList.remove('show');
 }
 
 // PDF에서 특정 부분을 잘라 캔버스에 렌더링 (1.pdf의 페이지 1을 활용)
