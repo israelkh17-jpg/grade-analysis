@@ -216,9 +216,58 @@ tr:hover{background:#f7fafc;}
 .loading-overlay p{margin-top:16px;font-size:14px;color:#4a5568;}
 
 @media print{
-  .header .right,.tabs,.filter-row,.btn-generate{display:none!important;}
-  .panel{display:block!important;page-break-inside:avoid;}
-  .card{break-inside:avoid;}
+  /* A4 세로, 여유 있는 여백 */
+  @page{size:A4 portrait;margin:14mm 12mm;}
+
+  /* 색상·그라디언트 보존 */
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important;}
+
+  /* 페이지 배경 단순화 */
+  body{background:#fff!important;}
+  #uploadScreen,#loadingOverlay,.modal-overlay{display:none!important;}
+
+  /* 헤더는 가볍게 표시(인쇄용 타이틀만), 버튼군은 전부 숨김 */
+  .header{background:#fff!important;color:#1e3a5f!important;padding:0 0 8px 0!important;border-bottom:2px solid #2d6a9f;margin-bottom:10px;page-break-after:avoid;}
+  .header h1{color:#1e3a5f!important;font-size:18pt!important;}
+  .header p{color:#4a5568!important;font-size:11pt!important;}
+  .header .right,.btn-back,.btn-print,.btn-help{display:none!important;}
+  .tabs,.filter-row,.btn-generate{display:none!important;}
+
+  /* 활성 탭만 인쇄(현재 화면에 보이는 분석 결과) */
+  .panel{display:none!important;}
+  .panel.active{display:block!important;}
+
+  /* 카드/그리드: 카드 단위로 깨지지 않도록 */
+  .container{padding:0!important;max-width:100%!important;}
+  .card{break-inside:avoid;page-break-inside:avoid;box-shadow:none!important;border:1px solid #cbd5e0;margin-bottom:10px!important;padding:10px 12px!important;}
+  .card h3{font-size:12pt!important;margin-bottom:6px!important;}
+  .grid-2{grid-template-columns:1fr 1fr!important;gap:10px!important;}
+
+  /* KPI 카드 컴팩트하게 */
+  .kpi-row{gap:6px!important;margin-bottom:10px!important;}
+  .kpi-card{padding:8px 10px!important;}
+  .kpi-card .label{font-size:9pt!important;}
+  .kpi-card .value{font-size:14pt!important;}
+
+  /* 차트 컨테이너 인쇄 크기 보정 */
+  .chart-container{max-height:7cm!important;}
+  canvas{max-width:100%!important;height:auto!important;}
+
+  /* 표: 줄 단위로 깨지지 않게 */
+  table{font-size:9pt!important;}
+  thead{display:table-header-group;}
+  tr,td,th{page-break-inside:avoid;}
+
+  /* 학생 분석 — 응답 그리드 컴팩트 */
+  .sa-grid{grid-template-columns:repeat(auto-fill,minmax(40px,1fr))!important;gap:3px!important;}
+  .sa-cell{font-size:8pt!important;}
+  .sa-cell .qn{font-size:9pt!important;}
+
+  /* AI 분석 영역 카드 */
+  .ai-area-card,.std-row,.area-card{break-inside:avoid;page-break-inside:avoid;}
+
+  /* 링크 URL 안 보이게 */
+  a[href]:after{content:none!important;}
 }
 
 /* 학생분석 - 응답 그리드 */
