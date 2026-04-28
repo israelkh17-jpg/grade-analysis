@@ -235,9 +235,9 @@ tr:hover{background:#f7fafc;}
   #uploadScreen,#loadingOverlay,.modal-overlay{display:none!important;}
 
   /* 헤더는 가볍게 표시(인쇄용 타이틀만), 버튼군은 전부 숨김 */
-  .header{background:#fff!important;color:#1e3a5f!important;padding:0 0 8px 0!important;border-bottom:2px solid #2d6a9f;margin-bottom:10px;page-break-after:avoid;}
-  .header h1{color:#1e3a5f!important;font-size:18pt!important;}
-  .header p{color:#4a5568!important;font-size:11pt!important;}
+  .header{background:#fff!important;color:#1e3a5f!important;padding:0 0 5px 0!important;border-bottom:2px solid #2d6a9f;margin-bottom:6px;page-break-after:avoid;}
+  .header h1{color:#1e3a5f!important;font-size:14pt!important;}
+  .header p{color:#4a5568!important;font-size:10pt!important;margin-top:2px!important;}
   .header .right,.btn-back,.btn-print,.btn-help{display:none!important;}
   .tabs,.filter-row,.btn-generate{display:none!important;}
 
@@ -247,15 +247,20 @@ tr:hover{background:#f7fafc;}
 
   /* 카드/그리드: 카드 단위로 깨지지 않도록 */
   .container{padding:0!important;max-width:100%!important;}
-  .card{break-inside:avoid;page-break-inside:avoid;box-shadow:none!important;border:1px solid #cbd5e0;margin-bottom:10px!important;padding:10px 12px!important;}
-  .card h3{font-size:12pt!important;margin-bottom:6px!important;}
-  .grid-2{grid-template-columns:1fr 1fr!important;gap:10px!important;}
+  .card{break-inside:avoid;page-break-inside:avoid;box-shadow:none!important;border:1px solid #cbd5e0;margin-bottom:8px!important;padding:8px 10px!important;}
+  .card h3{font-size:11pt!important;margin-bottom:4px!important;}
+  .grid-2{grid-template-columns:1fr 1fr!important;gap:8px!important;}
 
-  /* KPI 카드 컴팩트하게 */
-  .kpi-row{gap:6px!important;margin-bottom:10px!important;}
-  .kpi-card{padding:8px 10px!important;}
-  .kpi-card .label{font-size:9pt!important;}
-  .kpi-card .value{font-size:14pt!important;}
+  /* KPI 카드 — 6개를 한 줄에 강제 배치 */
+  .kpi-row{display:grid!important;grid-template-columns:repeat(6,1fr)!important;gap:4px!important;margin-bottom:6px!important;}
+  .kpi-card{padding:5px 6px!important;border-radius:6px!important;}
+  .kpi-card .label{font-size:8pt!important;}
+  .kpi-card .value{font-size:12pt!important;}
+  .kpi-card .sub{font-size:7pt!important;}
+
+  /* 문항분석 총평 컴팩트 */
+  .exam-summary{padding:8px 12px!important;margin:6px 0 8px!important;font-size:10pt!important;line-height:1.5!important;}
+  .exam-summary .es-title{font-size:11pt!important;margin-bottom:4px!important;}
 
   /* 차트 컨테이너 인쇄 크기 보정 */
   .chart-container{max-height:7cm!important;}
@@ -275,17 +280,16 @@ tr:hover{background:#f7fafc;}
   .ai-area-card,.std-row,.area-card{break-inside:avoid;page-break-inside:avoid;}
 
   /* 반별 비교 패널 — 3개 카드(테이블+박스플롯+구간차트)를 한 페이지에 압축 */
-  #panel-classCompare{page-break-inside:avoid;}
-  #panel-classCompare .card{margin-bottom:6px!important;padding:6px 10px!important;}
-  #panel-classCompare .card h3{font-size:10.5pt!important;margin-bottom:4px!important;}
-  #panel-classCompare .chart-container{max-height:5cm!important;}
-  #panel-classCompare table{font-size:8pt!important;}
-  #panel-classCompare table th,#panel-classCompare table td{padding:3px 6px!important;line-height:1.3!important;}
-  #panel-classCompare .boxplot-row{margin:2px 0!important;}
-  #panel-classCompare .boxplot-area{height:18px!important;}
-  #panel-classCompare .boxplot-box,#panel-classCompare .boxplot-median{height:14px!important;top:2px!important;}
-  #panel-classCompare .boxplot-line,#panel-classCompare .boxplot-cap{top:9px!important;}
-  #panel-classCompare .boxplot-label{font-size:9pt!important;width:32px!important;}
+  #panel-classCompare .card{margin-bottom:4px!important;padding:5px 8px!important;}
+  #panel-classCompare .card h3{font-size:10pt!important;margin-bottom:3px!important;}
+  #panel-classCompare .chart-container{max-height:4cm!important;}
+  #panel-classCompare table{font-size:7.5pt!important;}
+  #panel-classCompare table th,#panel-classCompare table td{padding:2px 5px!important;line-height:1.25!important;}
+  #panel-classCompare .boxplot-row{margin:1px 0!important;}
+  #panel-classCompare .boxplot-area{height:14px!important;}
+  #panel-classCompare .boxplot-box,#panel-classCompare .boxplot-median{height:10px!important;top:2px!important;}
+  #panel-classCompare .boxplot-line,#panel-classCompare .boxplot-cap{top:7px!important;}
+  #panel-classCompare .boxplot-label{font-size:8pt!important;width:28px!important;}
 
   /* 링크 URL 안 보이게 */
   a[href]:after{content:none!important;}
