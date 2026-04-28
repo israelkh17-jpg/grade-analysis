@@ -147,6 +147,14 @@ body{font-family:'Pretendard','Apple SD Gothic Neo','Noto Sans KR',sans-serif;ba
 .header .right{display:flex;gap:8px;}
 .btn-back,.btn-print{padding:8px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:1px solid rgba(255,255,255,0.3);background:rgba(255,255,255,0.1);color:#fff;transition:all 0.2s;}
 .btn-back:hover,.btn-print:hover{background:rgba(255,255,255,0.25);}
+.exam-summary{margin:12px 0 16px;padding:14px 18px;background:linear-gradient(135deg,#ebf8ff 0%,#f0fff4 100%);border-left:4px solid #2d6a9f;border-radius:8px;font-size:13px;line-height:1.7;color:#2d3748;box-shadow:0 1px 3px rgba(0,0,0,0.04);}
+.exam-summary:empty{display:none;}
+.exam-summary .es-title{font-size:13px;font-weight:700;color:#1e3a5f;margin-bottom:6px;display:flex;align-items:center;gap:6px;}
+.exam-summary .es-title .es-badge{font-size:10px;background:#2d6a9f;color:#fff;padding:2px 8px;border-radius:10px;font-weight:600;}
+.exam-summary .es-line{margin:3px 0;}
+.exam-summary b{color:#1e3a5f;}
+.exam-summary .es-warn{color:#c05621;}
+.exam-summary .es-good{color:#276749;}
 .btn-help{background:linear-gradient(135deg,#fbbf24,#f59e0b);border-color:#fbbf24;color:#1e3a5f;font-weight:700;box-shadow:0 2px 6px rgba(245,158,11,0.35);}
 .btn-help:hover{background:linear-gradient(135deg,#fde68a,#fbbf24);transform:translateY(-1px);box-shadow:0 4px 10px rgba(245,158,11,0.5);}
 .container{max-width:1280px;margin:0 auto;padding:20px;}
@@ -720,6 +728,9 @@ tr:hover{background:#f7fafc;}
       <button class="tab-btn" data-tab="studentList" onclick="showTab('studentList',this)">학생 성적표</button>
       <button class="tab-btn" data-tab="studentAnalysis" onclick="showTab('studentAnalysis',this)">학생분석</button>
     </div>
+
+    <!-- 문항분석 총평 (자동 생성) -->
+    <div class="exam-summary" id="examSummary"></div>
 
     <div class="panel active" id="panel-overview">
       <div class="grid-2">
@@ -1329,6 +1340,7 @@ function renderDashboard(data, examInfo, subjectName) {
   renderScoreDist();
   renderStudentList();
   renderStudentAnalysis();
+  renderExamSummary();
 
   // Reset to overview tab
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -2642,6 +2654,87 @@ function activateItemInfoSections() {
   if (sel && sel.value) selectStudentForAnalysis();
   if (typeof updateItemInfoButtonState === 'function') updateItemInfoButtonState();
   if (typeof updateAIAnalyzeButtonState === 'function') updateAIAnalyzeButtonState();
+  if (typeof renderExamSummary === 'function') renderExamSummary();
+}
+
+// ============================================================
+// 문항분석 총평 (자동 생성)
+// ============================================================
+function renderExamSummary() {
+  const box = document.getElementById('examSummary');
+  if (!box || !window.DATA) return;
+  const o = DATA.overview;
+  const items = DATA.itemAnalysis || [];
+  const totalScore = (DATA.scoreTypes && (DATA.scoreTypes.select_max + DATA.scoreTypes.essay_max)) || 100;
+
+  // 1) 평균·표준편차
+  const meanLine = `평균 <b>${o.mean}점</b> / 100점, 표준편차 <b>${o.std}</b>.`;
+
+  // 2) 의도 난이도 분포 + 예상-실제 차이 큰 문항 2개 (ITEM_INFO 있을 때만)
+  let levelLine = '';
+  let outlierLine = '';
+  if (window.ITEM_INFO && ITEM_INFO.length > 0) {
+    const expectedRate = { '쉬움': 80, '보통': 65, '어려움': 35 };
+    const counts = { '쉬움': 0, '보통': 0, '어려움': 0 };
+    const gaps = [];
+    for (const info of ITEM_INFO) {
+      if (counts[info.level] !== undefined) counts[info.level]++;
+      const it = items.find(i => i.q === info.q);
+      if (!it) continue;
+      const exp = expectedRate[info.level];
+      if (exp === undefined) continue;
+      gaps.push({ q: info.q, level: info.level, actual: it.correct_rate, expected: exp, diff: it.correct_rate - exp });
+    }
+    const total = counts['쉬움'] + counts['보통'] + counts['어려움'];
+    if (total > 0) {
+      const pct = (n) => Math.round(n / total * 100);
+      levelLine = `의도 난이도 — 쉬움 ${pct(counts['쉬움'])}% · 보통 ${pct(counts['보통'])}% · 어려움 ${pct(counts['어려움'])}%.`;
+    }
+    // 예상과 실제 차이 큰 문항 2개 (절대값 기준)
+    gaps.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
+    const top = gaps.slice(0, 2);
+    if (top.length > 0) {
+      const fmt = top.map(g => {
+        const cls = g.diff >= 0 ? 'es-good' : 'es-warn';
+        const dirText = g.diff >= 0 ? '체감 쉬움' : '체감 어려움';
+        const cause = g.diff >= 15
+          ? '정답 변별력이 약했거나 핵심 개념이 단순 기억 수준에 머문 것으로 보임'
+          : g.diff <= -15
+            ? '복합 추론·자료 해석 부담이 의도보다 컸을 가능성'
+            : '학생들의 사전 학습 수준 편차가 영향';
+        return `<span class="${cls}"><b>${g.q}번</b>(${g.level} 의도 → 실제 ${Math.round(g.actual)}%, ${dirText})</span> — ${cause}`;
+      }).join('; ');
+      outlierLine = `예상-실제 차이 큰 문항: ${fmt}.`;
+    }
+  } else {
+    levelLine = '<span style="color:#a0aec0;">📋 문항정보 등록 시 의도 난이도 비교 분석이 표시됩니다.</span>';
+  }
+
+  // 3) 다음 시험 권고 (간단 휴리스틱)
+  let recoLine = '';
+  if (window.ITEM_INFO && ITEM_INFO.length > 0 && items.length > 0) {
+    const easy = items.filter(it => {
+      const info = ITEM_INFO.find(x => x.q === it.q);
+      return info && info.level === '어려움' && it.correct_rate >= 70;
+    });
+    const hard = items.filter(it => {
+      const info = ITEM_INFO.find(x => x.q === it.q);
+      return info && info.level === '쉬움' && it.correct_rate < 60;
+    });
+    const recos = [];
+    if (easy.length > 0) recos.push('어려움 의도 문항에 분석·종합·적용 요소를 보강해 변별력 강화');
+    if (hard.length > 0) recos.push('쉬움 의도 문항의 발문·자료 표현을 명료히 하여 체감 난이도 안정화');
+    if (o.std >= 22) recos.push('표준편차가 커 학생 간 격차 큼 — 중·하위권용 보충 문항 비중 검토');
+    else if (o.std <= 12) recos.push('점수 분포가 좁음 — 상위권 변별 강화 위한 고난도 문항 추가 검토');
+    if (recos.length === 0) recos.push('현 출제 구성이 의도와 부합하므로 유사 난이도 분포를 유지');
+    recoLine = `다음 시험 고려: ${recos.join('; ')}.`;
+  }
+
+  const lines = [meanLine, levelLine, outlierLine, recoLine].filter(Boolean);
+  box.innerHTML = `
+    <div class="es-title">📊 문항분석 총평 <span class="es-badge">자동 생성</span></div>
+    ${lines.map(l => `<div class="es-line">${l}</div>`).join('')}
+  `;
 }
 
 // ============================================================
