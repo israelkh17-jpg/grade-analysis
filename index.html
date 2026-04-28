@@ -2658,82 +2658,66 @@ function activateItemInfoSections() {
 }
 
 // ============================================================
-// 문항분석 총평 (자동 생성)
+// 문항분석 총평 (자동 생성, 진술문 ~150자)
 // ============================================================
 function renderExamSummary() {
   const box = document.getElementById('examSummary');
   if (!box || !window.DATA) return;
   const o = DATA.overview;
   const items = DATA.itemAnalysis || [];
-  const totalScore = (DATA.scoreTypes && (DATA.scoreTypes.select_max + DATA.scoreTypes.essay_max)) || 100;
+  const sentences = [];
 
-  // 1) 평균·표준편차
-  const meanLine = `평균 <b>${o.mean}점</b> / 100점, 표준편차 <b>${o.std}</b>.`;
+  // ① 평균·표준편차 + 분포 특성
+  let s1;
+  if (o.std >= 22) s1 = `평균 <b>${o.mean}점</b>, 표준편차 <b>${o.std}</b>로 학생 간 격차가 크다.`;
+  else if (o.std <= 12) s1 = `평균 <b>${o.mean}점</b>, 표준편차 <b>${o.std}</b>로 점수 분포가 좁다.`;
+  else s1 = `평균 <b>${o.mean}점</b>, 표준편차 <b>${o.std}</b>로 비교적 안정적인 분포를 보인다.`;
+  sentences.push(s1);
 
-  // 2) 의도 난이도 분포 + 예상-실제 차이 큰 문항 2개 (ITEM_INFO 있을 때만)
-  let levelLine = '';
-  let outlierLine = '';
-  if (typeof ITEM_INFO !== 'undefined' && ITEM_INFO && ITEM_INFO.length > 0) {
+  const hasItemInfo = typeof ITEM_INFO !== 'undefined' && ITEM_INFO && ITEM_INFO.length > 0;
+
+  if (hasItemInfo) {
     const expectedRate = { '쉬움': 80, '보통': 65, '어려움': 35 };
-    const counts = { '쉬움': 0, '보통': 0, '어려움': 0 };
     const gaps = [];
     for (const info of ITEM_INFO) {
-      if (counts[info.level] !== undefined) counts[info.level]++;
       const it = items.find(i => i.q === info.q);
       if (!it) continue;
       const exp = expectedRate[info.level];
       if (exp === undefined) continue;
-      gaps.push({ q: info.q, level: info.level, actual: it.correct_rate, expected: exp, diff: it.correct_rate - exp });
+      gaps.push({ q: info.q, level: info.level, actual: it.correct_rate, diff: it.correct_rate - exp });
     }
-    const total = counts['쉬움'] + counts['보통'] + counts['어려움'];
-    if (total > 0) {
-      const pct = (n) => Math.round(n / total * 100);
-      levelLine = `의도 난이도 — 쉬움 ${pct(counts['쉬움'])}% · 보통 ${pct(counts['보통'])}% · 어려움 ${pct(counts['어려움'])}%.`;
-    }
-    // 예상과 실제 차이 큰 문항 2개 (절대값 기준)
+
+    // ② 의도-실제 차이 큰 문항 2개 (한 문장)
     gaps.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
     const top = gaps.slice(0, 2);
     if (top.length > 0) {
-      const fmt = top.map(g => {
-        const cls = g.diff >= 0 ? 'es-good' : 'es-warn';
-        const dirText = g.diff >= 0 ? '체감 쉬움' : '체감 어려움';
-        const cause = g.diff >= 15
-          ? '정답 변별력이 약했거나 핵심 개념이 단순 기억 수준에 머문 것으로 보임'
-          : g.diff <= -15
-            ? '복합 추론·자료 해석 부담이 의도보다 컸을 가능성'
-            : '학생들의 사전 학습 수준 편차가 영향';
-        return `<span class="${cls}"><b>${g.q}번</b>(${g.level} 의도 → 실제 ${Math.round(g.actual)}%, ${dirText})</span> — ${cause}`;
-      }).join('; ');
-      outlierLine = `예상-실제 차이 큰 문항: ${fmt}.`;
+      const partsq = top.map(g => `<b>${g.q}번</b>(${g.level} 의도→실제 ${Math.round(g.actual)}%)`).join('과 ');
+      const allEasy = top.every(g => g.diff > 15);
+      const allHard = top.every(g => g.diff < -15);
+      let cause;
+      if (allEasy) cause = '변별력이 약했던 것으로 보인다';
+      else if (allHard) cause = '복합 추론 부담이 의도보다 컸던 것으로 보인다';
+      else cause = '의도와 체감 난이도 간 격차가 컸다';
+      sentences.push(`의도와 실제 정답률 차이가 큰 문항은 ${partsq}이며, ${cause}.`);
     }
+
+    // ③ 다음 시험 권고 (한 문장)
+    const easyCount = gaps.filter(g => g.level === '어려움' && g.actual >= 70).length;
+    const hardCount = gaps.filter(g => g.level === '쉬움' && g.actual < 60).length;
+    let reco;
+    if (easyCount >= 1) reco = '다음 시험에서는 어려움 의도 문항에 분석·종합·적용 요소를 보강하여 변별력을 높일 필요가 있다';
+    else if (hardCount >= 1) reco = '다음 시험에서는 쉬움 의도 문항의 발문과 자료 표현을 명료화하여 체감 난이도를 안정화할 필요가 있다';
+    else if (o.std >= 22) reco = '다음 시험에서는 중·하위권 보충 문항 비중을 늘릴 필요가 있다';
+    else if (o.std <= 12) reco = '다음 시험에서는 상위권 변별을 위해 고난도 문항을 보강할 필요가 있다';
+    else reco = '다음 시험에서도 현 출제 구성과 유사한 난이도 분포를 유지할 만하다';
+    sentences.push(reco + '.');
   } else {
-    levelLine = '<span style="color:#a0aec0;">📋 문항정보 등록 시 의도 난이도 비교 분석이 표시됩니다.</span>';
+    sentences.push('문항정보를 등록하면 의도 난이도 비교와 다음 시험 권고가 함께 제시된다.');
   }
 
-  // 3) 다음 시험 권고 (간단 휴리스틱)
-  let recoLine = '';
-  if (typeof ITEM_INFO !== 'undefined' && ITEM_INFO && ITEM_INFO.length > 0 && items.length > 0) {
-    const easy = items.filter(it => {
-      const info = ITEM_INFO.find(x => x.q === it.q);
-      return info && info.level === '어려움' && it.correct_rate >= 70;
-    });
-    const hard = items.filter(it => {
-      const info = ITEM_INFO.find(x => x.q === it.q);
-      return info && info.level === '쉬움' && it.correct_rate < 60;
-    });
-    const recos = [];
-    if (easy.length > 0) recos.push('어려움 의도 문항에 분석·종합·적용 요소를 보강해 변별력 강화');
-    if (hard.length > 0) recos.push('쉬움 의도 문항의 발문·자료 표현을 명료히 하여 체감 난이도 안정화');
-    if (o.std >= 22) recos.push('표준편차가 커 학생 간 격차 큼 — 중·하위권용 보충 문항 비중 검토');
-    else if (o.std <= 12) recos.push('점수 분포가 좁음 — 상위권 변별 강화 위한 고난도 문항 추가 검토');
-    if (recos.length === 0) recos.push('현 출제 구성이 의도와 부합하므로 유사 난이도 분포를 유지');
-    recoLine = `다음 시험 고려: ${recos.join('; ')}.`;
-  }
-
-  const lines = [meanLine, levelLine, outlierLine, recoLine].filter(Boolean);
   box.innerHTML = `
     <div class="es-title">📊 문항분석 총평 <span class="es-badge">자동 생성</span></div>
-    ${lines.map(l => `<div class="es-line">${l}</div>`).join('')}
+    <div class="es-line">${sentences.join(' ')}</div>
   `;
 }
 
