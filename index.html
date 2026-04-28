@@ -262,9 +262,12 @@ tr:hover{background:#f7fafc;}
   .exam-summary{padding:8px 12px!important;margin:6px 0 8px!important;font-size:10pt!important;line-height:1.5!important;}
   .exam-summary .es-title{font-size:11pt!important;margin-bottom:4px!important;}
 
-  /* 차트 컨테이너 인쇄 크기 보정 */
-  .chart-container{max-height:7cm!important;}
-  canvas{max-width:100%!important;height:auto!important;}
+  /* 차트 컨테이너 인쇄 크기 보정 — canvas 오버플로 방지 */
+  .chart-container{max-height:7cm!important;overflow:hidden!important;}
+  .chart-container canvas{max-height:7cm!important;max-width:100%!important;height:auto!important;}
+
+  /* 내용 영역별 평균 정답률 — 위쪽 막대 카드가 이미 동일 정보 표현하므로 차트는 숨김 */
+  #overviewAreaSection .chart-container{display:none!important;}
 
   /* 표: 줄 단위로 깨지지 않게 */
   table{font-size:9pt!important;}
