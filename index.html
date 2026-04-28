@@ -2658,7 +2658,7 @@ function activateItemInfoSections() {
 }
 
 // ============================================================
-// 문항분석 총평 (자동 생성, 진술문 ~150자)
+// 문항분석 총평 (자동 생성, 진술문 250~350자)
 // ============================================================
 function renderExamSummary() {
   const box = document.getElementById('examSummary');
@@ -2667,16 +2667,60 @@ function renderExamSummary() {
   const items = DATA.itemAnalysis || [];
   const sentences = [];
 
-  // ① 평균·표준편차 + 분포 특성
-  let s1;
-  if (o.std >= 22) s1 = `평균 <b>${o.mean}점</b>, 표준편차 <b>${o.std}</b>로 학생 간 격차가 크다.`;
-  else if (o.std <= 12) s1 = `평균 <b>${o.mean}점</b>, 표준편차 <b>${o.std}</b>로 점수 분포가 좁다.`;
-  else s1 = `평균 <b>${o.mean}점</b>, 표준편차 <b>${o.std}</b>로 비교적 안정적인 분포를 보인다.`;
-  sentences.push(s1);
-
   const hasItemInfo = typeof ITEM_INFO !== 'undefined' && ITEM_INFO && ITEM_INFO.length > 0;
 
+  // 점수 구간 비율 (90+, 50-)
+  const dist = (DATA.scoreDist && DATA.scoreDist.all) || [];
+  const totalN = dist.reduce((a, b) => a + b, 0) || o.total_students || 1;
+  const high = dist.length >= 10 ? dist[9] : 0;
+  const low = dist.slice(0, 5).reduce((a, b) => a + b, 0);
+  const highPct = Math.round(high / totalN * 100);
+  const lowPct = Math.round(low / totalN * 100);
+
+  // ① 평균·표준편차 + 분포 특성 + 점수 구간 비율
+  const stdDesc = o.std >= 22 ? '학생 간 격차가 크고' : o.std <= 12 ? '점수 분포가 좁고' : '비교적 안정적이며';
+  const polar = (highPct >= 25 && lowPct >= 25) ? '<span class="es-warn">양극화 경향이 뚜렷하다</span>'
+              : (highPct >= 30) ? '상위권 비중이 두터운 편이다'
+              : (lowPct >= 30) ? '<span class="es-warn">하위권 비중이 큰 편이다</span>'
+              : '구간별 분포가 비교적 고르다';
+  sentences.push(`평균 <b>${o.mean}점</b>, 표준편차 <b>${o.std}</b>로 ${stdDesc}, 90점 이상 <b>${highPct}%</b>·50점 미만 <b>${lowPct}%</b>로 ${polar}.`);
+
+  // ② 선택형 vs 서답형 격차 (있을 때만, 한 줄)
+  if (DATA.scoreTypes && DATA.scoreTypes.select_max && DATA.scoreTypes.essay_max) {
+    const sRate = DATA.scoreTypes.select_mean / DATA.scoreTypes.select_max * 100;
+    const eRate = DATA.scoreTypes.essay_mean / DATA.scoreTypes.essay_max * 100;
+    const gap = sRate - eRate;
+    if (Math.abs(gap) >= 15) {
+      const dir = gap > 0 ? '선택형 정답률이 서답형보다' : '서답형 정답률이 선택형보다';
+      sentences.push(`${dir} <b>${Math.abs(Math.round(gap))}%p</b> 높아 응답 유형 간 수행 격차가 관찰된다.`);
+    }
+  }
+
   if (hasItemInfo) {
+    // 영역별 평균 정답률
+    const areaAgg = {};
+    for (const info of ITEM_INFO) {
+      const it = items.find(i => i.q === info.q);
+      if (!it || !info.area) continue;
+      if (!areaAgg[info.area]) areaAgg[info.area] = { total: 0, count: 0 };
+      areaAgg[info.area].total += it.correct_rate;
+      areaAgg[info.area].count++;
+    }
+    const areas = Object.entries(areaAgg)
+      .filter(([_, v]) => v.count > 0)
+      .map(([name, v]) => ({ name, avg: Math.round(v.total / v.count) }))
+      .sort((a, b) => b.avg - a.avg);
+
+    // ③ 영역별 강점/약점
+    if (areas.length >= 2) {
+      const top = areas[0], bot = areas[areas.length - 1];
+      const gap = top.avg - bot.avg;
+      sentences.push(`영역별로는 <span class="es-good"><b>「${top.name}」</b>(평균 ${top.avg}%)</span>이 강점, <span class="es-warn"><b>「${bot.name}」</b>(${bot.avg}%)</span>이 약점이며 두 영역 격차가 <b>${gap}%p</b>에 달한다.`);
+    } else if (areas.length === 1) {
+      sentences.push(`내용 영역 「${areas[0].name}」의 평균 정답률은 ${areas[0].avg}%이다.`);
+    }
+
+    // ④ 의도-실제 차이 큰 문항
     const expectedRate = { '쉬움': 80, '보통': 65, '어려움': 35 };
     const gaps = [];
     for (const info of ITEM_INFO) {
@@ -2684,35 +2728,53 @@ function renderExamSummary() {
       if (!it) continue;
       const exp = expectedRate[info.level];
       if (exp === undefined) continue;
-      gaps.push({ q: info.q, level: info.level, actual: it.correct_rate, diff: it.correct_rate - exp });
+      gaps.push({ q: info.q, level: info.level, area: info.area, actual: it.correct_rate, diff: it.correct_rate - exp });
     }
-
-    // ② 의도-실제 차이 큰 문항 2개 (한 문장)
     gaps.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
-    const top = gaps.slice(0, 2);
-    if (top.length > 0) {
-      const partsq = top.map(g => `<b>${g.q}번</b>(${g.level} 의도→실제 ${Math.round(g.actual)}%)`).join('과 ');
-      const allEasy = top.every(g => g.diff > 15);
-      const allHard = top.every(g => g.diff < -15);
+    const top2 = gaps.slice(0, 2);
+    if (top2.length >= 1) {
+      const partsq = top2.map(g => `<b>${g.q}번</b>(${g.level} 의도→실제 ${Math.round(g.actual)}%)`).join('과 ');
       let cause;
-      if (allEasy) cause = '변별력이 약했던 것으로 보인다';
-      else if (allHard) cause = '복합 추론 부담이 의도보다 컸던 것으로 보인다';
-      else cause = '의도와 체감 난이도 간 격차가 컸다';
-      sentences.push(`의도와 실제 정답률 차이가 큰 문항은 ${partsq}이며, ${cause}.`);
+      if (top2.length >= 2) {
+        const [g1, g2] = top2;
+        if (g1.diff > 15 && g2.diff > 15) cause = '두 문항 모두 단순 기억·공식 적용 수준에 머물러 변별력이 부족했던 것';
+        else if (g1.diff < -15 && g2.diff < -15) cause = '복합 추론·자료 해석 부담이 의도보다 컸던 것';
+        else if (g1.diff > 15 && g2.diff < -15) cause = '전자는 변별력이 약했고 후자는 자료 해석 부담이 컸던 것';
+        else if (g1.diff < -15 && g2.diff > 15) cause = '전자는 자료 해석 부담이 컸고 후자는 변별력이 약했던 것';
+        else cause = '의도와 체감 난이도 간 격차가 발생한 것';
+      } else {
+        cause = top2[0].diff > 0 ? '체감 난이도가 의도보다 낮았던 것' : '체감 난이도가 의도보다 높았던 것';
+      }
+      sentences.push(`의도와 실제 정답률 차이가 큰 문항은 ${partsq}이며, ${cause}으로 보인다.`);
     }
 
-    // ③ 다음 시험 권고 (한 문장)
-    const easyCount = gaps.filter(g => g.level === '어려움' && g.actual >= 70).length;
-    const hardCount = gaps.filter(g => g.level === '쉬움' && g.actual < 60).length;
-    let reco;
-    if (easyCount >= 1) reco = '다음 시험에서는 어려움 의도 문항에 분석·종합·적용 요소를 보강하여 변별력을 높일 필요가 있다';
-    else if (hardCount >= 1) reco = '다음 시험에서는 쉬움 의도 문항의 발문과 자료 표현을 명료화하여 체감 난이도를 안정화할 필요가 있다';
-    else if (o.std >= 22) reco = '다음 시험에서는 중·하위권 보충 문항 비중을 늘릴 필요가 있다';
-    else if (o.std <= 12) reco = '다음 시험에서는 상위권 변별을 위해 고난도 문항을 보강할 필요가 있다';
-    else reco = '다음 시험에서도 현 출제 구성과 유사한 난이도 분포를 유지할 만하다';
-    sentences.push(reco + '.');
+    // ⑤ 다음 시험 권고
+    const totalHard = gaps.filter(g => g.level === '어려움').length;
+    const totalEasy = gaps.filter(g => g.level === '쉬움').length;
+    const easyTooEasy = gaps.filter(g => g.level === '어려움' && g.actual >= 70).length;
+    const easyTooHard = gaps.filter(g => g.level === '쉬움' && g.actual < 60).length;
+
+    let primary;
+    if (totalHard > 0 && easyTooEasy / totalHard >= 0.4) {
+      primary = '어려움 의도 문항에 다단계 추론·자료 해석 요소를 추가하여 변별력을 높일 필요가 있다';
+    } else if (totalEasy > 0 && easyTooHard / totalEasy >= 0.4) {
+      primary = '쉬움 의도 문항의 발문과 자료 표현을 명료화하여 체감 난이도를 안정시킬 필요가 있다';
+    } else if (o.std >= 22) {
+      primary = '중·하위권 보충 문항의 비중을 확대해 점수 격차를 완화할 필요가 있다';
+    } else if (o.std <= 12) {
+      primary = '상위권 변별을 위해 고난도 문항의 비중을 보강할 필요가 있다';
+    } else {
+      primary = '현재의 난이도 분포를 유지하면서 영역별 균형을 다듬을 만하다';
+    }
+    sentences.push(`다음 시험에서는 ${primary}.`);
+
+    // ⑥ 약점 영역 보충 권고 (영역 평균 < 55% 일 때)
+    const weakArea = areas.length >= 2 && areas[areas.length - 1].avg < 55 ? areas[areas.length - 1] : null;
+    if (weakArea) {
+      sentences.push(`특히 약점 영역인 <b>「${weakArea.name}」</b>(평균 ${weakArea.avg}%)의 핵심 개념을 진단·복습할 수 있는 문항 보강이 시급하다.`);
+    }
   } else {
-    sentences.push('문항정보를 등록하면 의도 난이도 비교와 다음 시험 권고가 함께 제시된다.');
+    sentences.push('문항정보를 등록하면 영역별 강·약점, 의도-실제 정답률 차이, 다음 시험 권고가 함께 제시된다.');
   }
 
   box.innerHTML = `
