@@ -737,7 +737,7 @@ tr:hover{background:#f7fafc;}
         <div class="card"><h3>점수 분포 히스토그램</h3><div class="chart-container"><canvas id="chartDistHist" height="280"></canvas></div></div>
         <div class="card"><h3>누적 분포</h3><div class="chart-container"><canvas id="chartDistCum" height="280"></canvas></div></div>
       </div>
-      <div class="card"><h3>성적 구간별 비율</h3><div class="chart-container"><canvas id="chartDistPie" height="260"></canvas></div></div>
+      <div class="card"><h3>성적 구간별 비율</h3><div class="chart-container" style="max-width:520px;margin:0 auto;"><canvas id="chartDistPie" height="220"></canvas></div></div>
     </div>
 
     <div class="panel" id="panel-studentList">
@@ -1440,7 +1440,7 @@ function updateDistChart() {
   const pieData = [d[9], d[7]+d[8], d[5]+d[6], d[0]+d[1]+d[2]+d[3]+d[4]];
   chartInstances.distPie = new Chart(document.getElementById('chartDistPie'), {
     type:'doughnut', data:{labels:['90점 이상','70~89점','50~69점','50점 미만'],datasets:[{data:pieData,backgroundColor:['#38a169','#2d6a9f','#d69e2e','#e53e3e']}]},
-    options:{responsive:true,plugins:{legend:{position:'right'}}}
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:12}}}}}
   });
 }
 
