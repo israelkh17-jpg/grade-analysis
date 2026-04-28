@@ -2673,7 +2673,7 @@ function renderExamSummary() {
   // 2) 의도 난이도 분포 + 예상-실제 차이 큰 문항 2개 (ITEM_INFO 있을 때만)
   let levelLine = '';
   let outlierLine = '';
-  if (window.ITEM_INFO && ITEM_INFO.length > 0) {
+  if (typeof ITEM_INFO !== 'undefined' && ITEM_INFO && ITEM_INFO.length > 0) {
     const expectedRate = { '쉬움': 80, '보통': 65, '어려움': 35 };
     const counts = { '쉬움': 0, '보통': 0, '어려움': 0 };
     const gaps = [];
@@ -2712,7 +2712,7 @@ function renderExamSummary() {
 
   // 3) 다음 시험 권고 (간단 휴리스틱)
   let recoLine = '';
-  if (window.ITEM_INFO && ITEM_INFO.length > 0 && items.length > 0) {
+  if (typeof ITEM_INFO !== 'undefined' && ITEM_INFO && ITEM_INFO.length > 0 && items.length > 0) {
     const easy = items.filter(it => {
       const info = ITEM_INFO.find(x => x.q === it.q);
       return info && info.level === '어려움' && it.correct_rate >= 70;
