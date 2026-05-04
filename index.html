@@ -805,6 +805,26 @@ tr:hover{background:#f7fafc;}
           </p>
           <div id="standardAnalysisList"></div>
         </div>
+
+        <!-- 등록된 문항정보 검증 표 — 모든 영역별 분석의 원본 데이터 -->
+        <div class="card">
+          <h3>🗂️ 등록된 문항정보 (내용영역·성취기준 매핑)</h3>
+          <p style="font-size:12px;color:#718096;margin-bottom:10px;">
+            업로드한 문항정보표에서 추출한 원본 데이터입니다. 이 표가 기준이 되어 위쪽 모든 분석(영역별·성취기준별·총평·학생분석)에 그대로 사용됩니다. 잘못된 항목이 있으면 PDF를 다시 등록해 주세요.
+          </p>
+          <div class="table-wrap"><table id="itemInfoTable" style="font-size:12px;">
+            <thead><tr>
+              <th style="width:60px;">문항</th>
+              <th style="width:160px;">내용영역</th>
+              <th style="width:130px;">성취기준 코드</th>
+              <th>성취기준 본문</th>
+              <th style="width:70px;">난이도</th>
+              <th style="width:60px;">배점</th>
+              <th style="width:60px;">정답</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table></div>
+        </div>
       </div>
     </div>
 
@@ -2748,6 +2768,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function activateItemInfoSections() {
   document.querySelectorAll('.iteminfo-section').forEach(s => s.classList.add('activated'));
+  renderItemInfoTable();
   renderAreaOverview();
   renderDifficultyValidation();
   renderStandardAnalysis();
@@ -2757,6 +2778,57 @@ function activateItemInfoSections() {
   if (typeof updateItemInfoButtonState === 'function') updateItemInfoButtonState();
   if (typeof updateAIAnalyzeButtonState === 'function') updateAIAnalyzeButtonState();
   if (typeof renderExamSummary === 'function') renderExamSummary();
+}
+
+// 등록된 문항정보 검증 표 — 영역별 그룹핑하여 표시
+function renderItemInfoTable() {
+  const tbody = document.querySelector('#itemInfoTable tbody');
+  if (!tbody || !ITEM_INFO || ITEM_INFO.length === 0) return;
+  // 영역 → 코드 → 문항 정렬
+  const sorted = [...ITEM_INFO].sort((a, b) => {
+    const areaCmp = (cleanNoise(a.area) || '').localeCompare(cleanNoise(b.area) || '', 'ko');
+    if (areaCmp !== 0) return areaCmp;
+    const codeCmp = (a.standardCode || '').localeCompare(b.standardCode || '', 'ko');
+    if (codeCmp !== 0) return codeCmp;
+    return (a.q || 0) - (b.q || 0);
+  });
+
+  // 영역별 색상
+  const areaColor = (name) => {
+    const colors = {
+      '과학의 기초': '#2d6a9f',
+      '물질과 규칙성': '#38a169',
+      '시스템과 상호작용': '#d53f8c'
+    };
+    return colors[name] || '#718096';
+  };
+
+  let prevArea = null, prevCode = null;
+  tbody.innerHTML = sorted.map(it => {
+    const area = cleanNoise(it.area) || '-';
+    const code = it.standardCode || '-';
+    const text = cleanNoise(it.standardText) || '';
+    const showArea = area !== prevArea;
+    const showCode = code !== prevCode || showArea;
+    const areaCell = showArea
+      ? `<td style="background:${areaColor(area)}1a;font-weight:600;color:${areaColor(area)};border-left:3px solid ${areaColor(area)};">${area}</td>`
+      : `<td style="border-left:3px solid ${areaColor(area)}33;"></td>`;
+    const codeCell = showCode
+      ? `<td><span class="std-chip">${code}</span></td>`
+      : `<td></td>`;
+    const truncText = text.length > 80 ? text.substring(0, 80) + '…' : text;
+    prevArea = area;
+    prevCode = code;
+    return `<tr>
+      <td style="text-align:center;font-weight:600;">${it.q}${it.isEssay ? ' <small style="color:#718096;">(서답형)</small>' : ''}</td>
+      ${areaCell}
+      ${codeCell}
+      <td style="font-size:11px;color:#4a5568;" title="${text}">${truncText}</td>
+      <td style="text-align:center;"><span class="diff-badge diff-${it.level || '보통'}">${it.level || '-'}</span></td>
+      <td style="text-align:center;">${it.point || '-'}</td>
+      <td style="text-align:center;">${(it.answer || '-').toString().slice(0, 12)}</td>
+    </tr>`;
+  }).join('');
 }
 
 // ============================================================
@@ -2803,10 +2875,12 @@ function renderExamSummary() {
     const areaAgg = {};
     for (const info of ITEM_INFO) {
       const it = items.find(i => i.q === info.q);
-      if (!it || !info.area) continue;
-      if (!areaAgg[info.area]) areaAgg[info.area] = { total: 0, count: 0 };
-      areaAgg[info.area].total += it.correct_rate;
-      areaAgg[info.area].count++;
+      if (!it) continue;
+      const areaKey = cleanNoise(info.area);
+      if (!areaKey) continue;
+      if (!areaAgg[areaKey]) areaAgg[areaKey] = { total: 0, count: 0 };
+      areaAgg[areaKey].total += it.correct_rate;
+      areaAgg[areaKey].count++;
     }
     const areas = Object.entries(areaAgg)
       .filter(([_, v]) => v.count > 0)
@@ -2895,10 +2969,11 @@ function renderAreaOverview() {
   ITEM_INFO.forEach(info => {
     const item = items.find(i => i.q === info.q);
     if (!item) return;
-    if (!areas[info.area]) areas[info.area] = { total: 0, count: 0, qs: [] };
-    areas[info.area].total += item.correct_rate;
-    areas[info.area].count++;
-    areas[info.area].qs.push(item.q);
+    const areaKey = cleanNoise(info.area) || '미분류';
+    if (!areas[areaKey]) areas[areaKey] = { total: 0, count: 0, qs: [] };
+    areas[areaKey].total += item.correct_rate;
+    areas[areaKey].count++;
+    areas[areaKey].qs.push(item.q);
   });
   const areaList = Object.entries(areas).map(([name, d]) => ({
     name, avg: Math.round(d.total / d.count * 10) / 10, count: d.count, qs: d.qs
@@ -2927,12 +3002,18 @@ function renderStandardAnalysis() {
   ITEM_INFO.forEach(info => {
     const item = items.find(i => i.q === info.q);
     if (!item) return;
-    if (!standards[info.standardCode]) {
-      standards[info.standardCode] = { code: info.standardCode, text: info.standardText, area: info.area, total: 0, count: 0, qs: [] };
+    const code = info.standardCode || '미분류';
+    if (!standards[code]) {
+      standards[code] = {
+        code,
+        text: cleanNoise(info.standardText),
+        area: cleanNoise(info.area),
+        total: 0, count: 0, qs: []
+      };
     }
-    standards[info.standardCode].total += item.correct_rate;
-    standards[info.standardCode].count++;
-    standards[info.standardCode].qs.push(item.q);
+    standards[code].total += item.correct_rate;
+    standards[code].count++;
+    standards[code].qs.push(item.q);
   });
   const stdList = Object.values(standards).map(s => ({
     ...s, avg: Math.round(s.total / s.count * 10) / 10
@@ -3202,12 +3283,18 @@ function renderStudentAreaAnalysis(student) {
   const standards = {};
   ITEM_INFO.forEach(info => {
     if (info.q < 1 || info.q > student.itemCorrect.length) return;
-    if (!standards[info.standardCode]) {
-      standards[info.standardCode] = { code: info.standardCode, text: info.standardText, area: info.area, total: 0, correct: 0, qs: [] };
+    const code = info.standardCode || '미분류';
+    if (!standards[code]) {
+      standards[code] = {
+        code,
+        text: cleanNoise(info.standardText),
+        area: cleanNoise(info.area),
+        total: 0, correct: 0, qs: []
+      };
     }
-    standards[info.standardCode].total++;
-    if (student.itemCorrect[info.q-1] === 1) standards[info.standardCode].correct++;
-    standards[info.standardCode].qs.push(info.q);
+    standards[code].total++;
+    if (student.itemCorrect[info.q-1] === 1) standards[code].correct++;
+    standards[code].qs.push(info.q);
   });
   const stdList = Object.values(standards).map(s => ({
     ...s, rate: Math.round(s.correct / s.total * 1000) / 10
