@@ -369,7 +369,8 @@ tr:hover{background:#f7fafc;}
 .area-progress-fill{height:100%;border-radius:7px;display:flex;align-items:center;justify-content:flex-end;padding-right:6px;font-size:10px;font-weight:700;color:#fff;}
 
 /* 성취기준 행 */
-.std-row{display:grid;grid-template-columns:120px 1fr 80px 80px;gap:10px;padding:8px 12px;border-bottom:1px solid #edf2f7;font-size:12px;align-items:center;}
+.std-row{display:grid;grid-template-columns:120px 1fr 100px 70px;gap:10px;padding:8px 12px;border-bottom:1px solid #edf2f7;font-size:12px;align-items:center;}
+.std-row .area-badge{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;display:inline-block;}
 .std-row:hover{background:#f7fafc;}
 .std-row .std-code{font-family:monospace;font-size:11px;color:#2d6a9f;font-weight:700;}
 .std-row .std-rate{text-align:right;font-weight:700;}
@@ -2523,6 +2524,10 @@ async function parseItemInfoPDF(file) {
       continue;
     }
 
+    // 페이지 헤더(예: "동북고등학교/2026.04.07 15:32/10.65.***.13/강현식") 스킵
+    // 날짜·시간 + 슬래시 패턴이면 페이지 메타로 간주, 현재 문항 흐름 유지
+    if (/\d{4}\.\d{2}\.\d{2}\s+\d{1,2}:\d{2}/.test(rowText)) continue;
+
     // 첫 번째 항목이 순수 숫자인지 확인 (문항 시작)
     const first = row.items[0];
     if (!first) continue;
@@ -2852,13 +2857,23 @@ function renderStandardAnalysis() {
     ...s, avg: Math.round(s.total / s.count * 10) / 10
   })).sort((a, b) => a.avg - b.avg);  // 낮은 도달도 우선
 
+  // 페이지 헤더·시간 도장 등 잡음 제거
+  const cleanNoise = t => (t || '')
+    .replace(/[가-힣]+\/\d{4}\.\d{2}\.\d{2}\s+\d{1,2}:\d{2}\/[\d.*]+\/[가-힣]+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
   document.getElementById('standardAnalysisList').innerHTML = stdList.map(s => {
     const color = s.avg >= 70 ? '#276749' : s.avg >= 50 ? '#975a16' : '#c53030';
-    const truncText = s.text.length > 60 ? s.text.substring(0, 60) + '...' : s.text;
+    const cleanText = cleanNoise(s.text);
+    const truncText = cleanText.length > 60 ? cleanText.substring(0, 60) + '...' : cleanText;
+    const cleanArea = cleanNoise(s.area);
+    const safeArea = cleanArea.length > 12 ? cleanArea.substring(0, 12) + '…' : cleanArea;
+    const areaClass = (cleanArea || '').replace(/\s/g, '').substring(0, 30);
     return `<div class="std-row">
       <span><span class="std-chip">${s.code}</span><br><small style="color:#a0aec0;">문항: ${s.qs.join(', ')}</small></span>
       <span style="font-size:11px;color:#4a5568;">${truncText}</span>
-      <span class="area-badge area-${s.area.replace(/\s/g,'')}">${s.area}</span>
+      <span class="area-badge area-${areaClass}" title="${cleanArea}">${safeArea}</span>
       <span class="std-rate" style="color:${color};">${s.avg}%</span>
     </div>`;
   }).join('');
