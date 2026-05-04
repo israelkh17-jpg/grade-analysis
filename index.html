@@ -266,9 +266,6 @@ tr:hover{background:#f7fafc;}
   .chart-container{max-height:7cm!important;overflow:hidden!important;}
   .chart-container canvas{max-height:7cm!important;max-width:100%!important;height:auto!important;}
 
-  /* 내용 영역별 평균 정답률 — 위쪽 막대 카드가 이미 동일 정보 표현하므로 차트는 숨김 */
-  #overviewAreaSection .chart-container{display:none!important;}
-
   /* 표: 줄 단위로 깨지지 않게 */
   table{font-size:9pt!important;}
   thead{display:table-header-group;}
@@ -764,7 +761,6 @@ tr:hover{background:#f7fafc;}
         <div class="card">
           <h3>📚 내용 영역별 평균 정답률</h3>
           <div id="overviewAreaCards"></div>
-          <div class="chart-container" style="margin-top:14px;"><canvas id="chartAreaOverview" height="220"></canvas></div>
         </div>
       </div>
     </div>
@@ -2833,22 +2829,6 @@ function renderAreaOverview() {
       <div class="area-progress-bar"><div class="area-progress-fill" style="width:${a.avg}%;background:${color};">${a.avg}%</div></div>
     </div>`;
   }).join('');
-
-  // Chart
-  if (chartInstances.areaOverview) chartInstances.areaOverview.destroy();
-  chartInstances.areaOverview = new Chart(document.getElementById('chartAreaOverview'), {
-    type:'bar',
-    data:{
-      labels: areaList.map(a => a.name),
-      datasets:[{
-        label:'평균 정답률 (%)',
-        data: areaList.map(a => a.avg),
-        backgroundColor: areaList.map(a => a.avg >= 70 ? 'rgba(56,161,105,0.7)' : a.avg >= 50 ? 'rgba(214,158,46,0.7)' : 'rgba(229,62,62,0.7)'),
-        borderRadius:4
-      }]
-    },
-    options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,max:100,title:{display:true,text:'정답률(%)'}}}}
-  });
 }
 
 // ============================================================
