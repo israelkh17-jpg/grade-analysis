@@ -2455,15 +2455,28 @@ async function parseItemInfoPDF(file) {
     return b.y - a.y;
   });
 
-  // y좌표가 비슷한 항목들을 같은 행으로 그룹화 (셀 높이 고려 — 2줄 셀에서 중앙 배치된 qNum이 묶이도록 허용)
+  // y 그룹화 임계값을 문서의 line-height에 맞춰 자동 산출
+  // (중앙 정렬된 qNum + 다중 줄 성취기준이 한 행으로 묶이도록 chaining 사용)
+  const yDiffs = [];
+  for (let i = 1; i < allItems.length; i++) {
+    if (allItems[i].page !== allItems[i-1].page) continue;
+    const d = allItems[i-1].y - allItems[i].y;
+    if (d > 1 && d < 50) yDiffs.push(d);
+  }
+  yDiffs.sort((a, b) => a - b);
+  const medianDiff = yDiffs.length ? yDiffs[Math.floor(yDiffs.length / 2)] : 12;
+  const yThreshold = Math.max(10, Math.min(20, medianDiff * 1.4));
+
   const rows = [];
   let cur = null;
   for (const it of allItems) {
-    if (!cur || it.page !== cur.page || Math.abs(it.y - cur.y) > 8) {
+    // chaining: 가장 최근 y와 비교해 임계값 안이면 같은 행으로 흡수
+    if (!cur || it.page !== cur.page || Math.abs(it.y - cur.y) > yThreshold) {
       cur = { items: [], y: it.y, page: it.page };
       rows.push(cur);
     }
     cur.items.push(it);
+    cur.y = it.y; // 체이닝 — 다음 비교는 가장 최근 y 기준
   }
   rows.forEach(r => r.items.sort((a, b) => a.x - b.x));
 
@@ -2507,12 +2520,27 @@ async function parseItemInfoPDF(file) {
   // 요약/잡음 행 판별
   const SKIP_ROW_MARKERS = ['총합계', '비율(', '비율 (', '고사일시', '공동출제자', '총 문항수', '과목 코드', '문항 정보'];
 
+  // 다음 qMatch 행이 흡수할 orphan 행(예: bracket 만 있고 qNum 없는 행) 버퍼
+  let pendingOrphans = [];
+
+  // 헬퍼: orphan 행 한 줄을 currentItem.standardText에 흡수
+  function absorbOrphanRow(row, item) {
+    for (const it of row.items) {
+      const s = it.str;
+      if (!s || s === '○') continue;
+      if (s.startsWith('[') || s.endsWith(']') || /[가-힣]/.test(s)) {
+        item.standardText += ' ' + s;
+      }
+    }
+  }
+
   for (const row of rows) {
     const rowText = row.items.map(i => i.str).join(' ');
 
     // 서답형 섹션 시작 감지
     if (rowText.includes('서답형 문항') || rowText.includes('서답형문항')) {
       pushCurrent();
+      pendingOrphans = [];
       serdapMode = true;
       lastSelectiveQ = items.length > 0 ? Math.max(...items.map(i => i.q)) : 0;
       continue;
@@ -2521,11 +2549,11 @@ async function parseItemInfoPDF(file) {
     // 요약/헤더 행 스킵
     if (SKIP_ROW_MARKERS.some(m => rowText.includes(m))) {
       pushCurrent();
+      pendingOrphans = [];
       continue;
     }
 
     // 페이지 헤더(예: "동북고등학교/2026.04.07 15:32/10.65.***.13/강현식") 스킵
-    // 날짜·시간 + 슬래시 패턴이면 페이지 메타로 간주, 현재 문항 흐름 유지
     if (/\d{4}\.\d{2}\.\d{2}\s+\d{1,2}:\d{2}/.test(rowText)) continue;
 
     // 첫 번째 항목이 순수 숫자인지 확인 (문항 시작)
@@ -2537,9 +2565,8 @@ async function parseItemInfoPDF(file) {
       const qNum = parseInt(qMatch[1]);
       if (qNum >= 1 && qNum <= 100) {
         const rest = row.items.slice(1);
-        // 페이지 푸터 "1 / 2 동북고등학교" 류 필터: qNum 바로 뒤가 "/"이면 스킵
+        // 페이지 푸터 "1 / 2 동북고등학교" 류 필터
         if (rest[0] && rest[0].str === '/') continue;
-        // 데이터 행 시그니처: qNum 뒤에 대괄호 또는 ○ 이 있거나, 한글 단어가 1개 이상 있어야 함
         const hasDataSignature = rest.some(it => {
           const s = it.str;
           return s.startsWith('[') || s === '○' || /[가-힣]/.test(s);
@@ -2553,24 +2580,34 @@ async function parseItemInfoPDF(file) {
             level: detectLevel(row.items) || '', point: 0, answer: '',
             isEssay: serdapMode
           };
-          // 같은 행 항목들을 영역/성취기준/배점/정답으로 분배
-          assignRowItems(rest, currentItem);
+          // qNum 위에 떠 있던 orphan 행(보통 bracket 첫 줄)을 standardText로 흡수
+          for (const orphan of pendingOrphans) absorbOrphanRow(orphan, currentItem);
+          pendingOrphans = [];
+          // 같은 행(qMatch 행) 항목들 분배 — area도 수집 가능
+          assignRowItems(rest, currentItem, false);
           continue;
         }
       }
     }
 
-    // 이전 문항의 연속 행 (성취기준 wrap, 또는 난이도/배점/정답이 다음 행에 있을 때)
+    // 이전 문항의 연속 행 또는 orphan 후보
     if (currentItem) {
       const lv = detectLevel(row.items);
       if (lv && !currentItem.level) currentItem.level = lv;
-      assignRowItems(row.items, currentItem);
+      // 연속 행 — 한글은 모두 standardText로(area 추가 금지)
+      assignRowItems(row.items, currentItem, true);
+    } else {
+      // currentItem 아직 없음 — 다음 qMatch가 흡수하도록 버퍼
+      // (단, 너무 많이 쌓이지 않도록 최근 6행만 유지)
+      pendingOrphans.push(row);
+      if (pendingOrphans.length > 6) pendingOrphans.shift();
     }
   }
   pushCurrent();
 
   // 한 행의 항목들을 currentItem의 area/standardText/point/answer로 분배
-  function assignRowItems(rowItems, item) {
+  // isContinuation: 연속 행이면 area에 새로 추가하지 않고 standardText로만 누적
+  function assignRowItems(rowItems, item, isContinuation) {
     for (const it of rowItems) {
       const s = it.str;
       if (!s || s === '○') continue;
@@ -2579,15 +2616,18 @@ async function parseItemInfoPDF(file) {
         item.answer = item.answer ? `${item.answer} ${s}` : s;
         continue;
       }
-      // 대괄호로 시작하는 성취기준 코드 또는 한글 텍스트
       const hasKorean = /[가-힣A-Za-zⅠ-Ⅻ]/.test(s);
+      // 대괄호로 시작/끝나는 토큰은 성취기준 본문
       if (s.startsWith('[') || s.endsWith(']')) {
         item.standardText += ' ' + s;
         continue;
       }
       if (hasKorean) {
-        // 성취기준 본문이 아직 비었고 영역에 적재 여지 있으면 영역으로
-        if (!item.standardText.trim() && !/^\s*\[/.test(s)) {
+        if (isContinuation) {
+          // 연속 행에서는 한글이 무조건 standardText로 — area 오염 방지
+          item.standardText += ' ' + s;
+        } else if (!item.standardText.trim()) {
+          // qMatch 행에서 아직 bracket을 못 봤으면 area 컬럼
           item.area = (item.area ? item.area + ' ' : '') + s;
         } else {
           item.standardText += ' ' + s;
