@@ -1866,6 +1866,14 @@ function drawCroppedImage(srcCanvas, dstCanvas, xPct, yPct, x2Pct, y2Pct) {
 // ============================================================
 let ITEM_INFO = null; // [{q, area, standardCode, standardText, level, point, answer}, ...]
 
+// 페이지 헤더·시간 도장 등 잡음 제거 (PDF 추출 시 area/standardText에 섞일 수 있는 메타 텍스트 정리)
+function cleanNoise(t) {
+  return (t || '')
+    .replace(/[가-힣]+\/\d{4}\.\d{2}\.\d{2}\s+\d{1,2}:\d{2}\/[\d.*]+\/[가-힣]+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function openItemInfoModal() {
   document.getElementById('itemInfoModal').classList.add('show');
   document.getElementById('itemInfoStatus').className = 'modal-info';
@@ -2449,6 +2457,16 @@ async function parseItemInfoPDF(file) {
 
   const eoX = eo.x, boX = bo.x, swX = sw.x;
 
+  // 컬럼 헤더 x 좌표 (내용영역·성취기준·배점·정답) — 라우팅 기준으로 사용
+  const hdrArea = allItems.find(i => i.str === '내용영역');
+  const hdrStd = allItems.find(i => i.str === '성취기준');
+  const hdrPoint = allItems.find(i => i.str === '배점');
+  const hdrAnswer = allItems.find(i => i.str === '정답');
+  // 성취기준 컬럼 시작 x — 이보다 작으면 area, 크면 standardText
+  // 헤더 못 찾으면 어려움 헤더 - 100쯤을 기본값으로
+  const stdColX = hdrStd ? hdrStd.x : (eoX - 120);
+  const areaColX = hdrArea ? hdrArea.x : (stdColX - 80);
+
   // 페이지별로, y좌표(위에서 아래) 순으로 정렬
   allItems.sort((a, b) => {
     if (a.page !== b.page) return a.page - b.page;
@@ -2523,15 +2541,34 @@ async function parseItemInfoPDF(file) {
   // 다음 qMatch 행이 흡수할 orphan 행(예: bracket 만 있고 qNum 없는 행) 버퍼
   let pendingOrphans = [];
 
-  // 헬퍼: orphan 행 한 줄을 currentItem.standardText에 흡수
-  function absorbOrphanRow(row, item) {
-    for (const it of row.items) {
-      const s = it.str;
-      if (!s || s === '○') continue;
-      if (s.startsWith('[') || s.endsWith(']') || /[가-힣]/.test(s)) {
-        item.standardText += ' ' + s;
+  // 헬퍼: 토큰 x 좌표 기반으로 area / standardText 라우팅 결정
+  // 컬럼 경계는 stdColX (성취기준 헤더 x). 토큰 중심이 이보다 충분히 왼쪽이면 area.
+  function routeByX(x) {
+    return x < (stdColX - 10) ? 'area' : 'std';
+  }
+
+  // 헬퍼: orphan 행들을 area/standardText 앞쪽에 prepend (원래 순서 보존)
+  function prependOrphans(orphans, item) {
+    let preArea = '', preStd = '';
+    for (const orphan of orphans) {
+      for (const it of orphan.items) {
+        const s = it.str;
+        if (!s || s === '○') continue;
+        if (/별지|참조/.test(s)) continue; // 정답 영역은 건너뜀
+        if (/^\d+(?:\.\d+)?$/.test(s)) continue; // 숫자 건너뜀
+        // bracket 시작 토큰은 무조건 standardText
+        if (s.startsWith('[') || s.endsWith(']')) {
+          preStd += ' ' + s;
+          continue;
+        }
+        if (/[가-힣A-Za-zⅠ-Ⅻ]/.test(s)) {
+          if (routeByX(it.x) === 'area') preArea += ' ' + s;
+          else preStd += ' ' + s;
+        }
       }
     }
+    if (preArea.trim()) item.area = (preArea + ' ' + item.area).replace(/\s+/g, ' ').trim();
+    if (preStd.trim()) item.standardText = (preStd + ' ' + item.standardText).replace(/\s+/g, ' ').trim();
   }
 
   for (const row of rows) {
@@ -2580,11 +2617,13 @@ async function parseItemInfoPDF(file) {
             level: detectLevel(row.items) || '', point: 0, answer: '',
             isEssay: serdapMode
           };
-          // qNum 위에 떠 있던 orphan 행(보통 bracket 첫 줄)을 standardText로 흡수
-          for (const orphan of pendingOrphans) absorbOrphanRow(orphan, currentItem);
-          pendingOrphans = [];
-          // 같은 행(qMatch 행) 항목들 분배 — area도 수집 가능
+          // 1) 먼저 qMatch 행 자체를 처리 (x 좌표 기반 라우팅)
           assignRowItems(rest, currentItem, false);
+          // 2) 그 위에 떠 있던 orphan 행(보통 bracket 첫 줄·area 추가 단어 등)을 앞쪽에 prepend
+          if (pendingOrphans.length > 0) {
+            prependOrphans(pendingOrphans, currentItem);
+            pendingOrphans = [];
+          }
           continue;
         }
       }
@@ -2606,7 +2645,8 @@ async function parseItemInfoPDF(file) {
   pushCurrent();
 
   // 한 행의 항목들을 currentItem의 area/standardText/point/answer로 분배
-  // isContinuation: 연속 행이면 area에 새로 추가하지 않고 standardText로만 누적
+  // - 한글 토큰은 x 좌표로 area / standardText 라우팅(stdColX 기준)
+  // - 연속 행에서는 area에 새로 추가하지 않음(area 오염 방지)
   function assignRowItems(rowItems, item, isContinuation) {
     for (const it of rowItems) {
       const s = it.str;
@@ -2617,20 +2657,22 @@ async function parseItemInfoPDF(file) {
         continue;
       }
       const hasKorean = /[가-힣A-Za-zⅠ-Ⅻ]/.test(s);
-      // 대괄호로 시작/끝나는 토큰은 성취기준 본문
+      // 대괄호 토큰은 무조건 성취기준 본문
       if (s.startsWith('[') || s.endsWith(']')) {
         item.standardText += ' ' + s;
         continue;
       }
       if (hasKorean) {
         if (isContinuation) {
-          // 연속 행에서는 한글이 무조건 standardText로 — area 오염 방지
+          // 연속 행에서는 한글이 무조건 standardText로
           item.standardText += ' ' + s;
-        } else if (!item.standardText.trim()) {
-          // qMatch 행에서 아직 bracket을 못 봤으면 area 컬럼
-          item.area = (item.area ? item.area + ' ' : '') + s;
         } else {
-          item.standardText += ' ' + s;
+          // qMatch 행: x 좌표로 area / std 라우팅
+          if (routeByX(it.x) === 'area') {
+            item.area = (item.area ? item.area + ' ' : '') + s;
+          } else {
+            item.standardText += ' ' + s;
+          }
         }
         continue;
       }
@@ -2897,12 +2939,6 @@ function renderStandardAnalysis() {
     ...s, avg: Math.round(s.total / s.count * 10) / 10
   })).sort((a, b) => a.avg - b.avg);  // 낮은 도달도 우선
 
-  // 페이지 헤더·시간 도장 등 잡음 제거
-  const cleanNoise = t => (t || '')
-    .replace(/[가-힣]+\/\d{4}\.\d{2}\.\d{2}\s+\d{1,2}:\d{2}\/[\d.*]+\/[가-힣]+/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-
   document.getElementById('standardAnalysisList').innerHTML = stdList.map(s => {
     const color = s.avg >= 70 ? '#276749' : s.avg >= 50 ? '#975a16' : '#c53030';
     const cleanText = cleanNoise(s.text);
@@ -3048,14 +3084,15 @@ function renderStudentAreaAnalysis(student) {
       return;
     }
     matchedCount++;
-    if (!areas[info.area]) areas[info.area] = { total: 0, correct: 0, qs: [], item_rates: [], class_rates: [] };
-    areas[info.area].total++;
-    if (student.itemCorrect[info.q-1] === 1) areas[info.area].correct++;
-    areas[info.area].qs.push(info.q);
+    const areaKey = cleanNoise(info.area) || '기타';
+    if (!areas[areaKey]) areas[areaKey] = { total: 0, correct: 0, qs: [], item_rates: [], class_rates: [] };
+    areas[areaKey].total++;
+    if (student.itemCorrect[info.q-1] === 1) areas[areaKey].correct++;
+    areas[areaKey].qs.push(info.q);
     const it = items.find(x => x.q === info.q);
     if (it) {
-      areas[info.area].item_rates.push(it.correct_rate);
-      areas[info.area].class_rates.push(it.class_rates[student.class] || 0);
+      areas[areaKey].item_rates.push(it.correct_rate);
+      areas[areaKey].class_rates.push(it.class_rates[student.class] || 0);
     }
   });
   console.log('[renderStudentAreaAnalysis] matched:', matchedCount, 'skipped Qs:', skippedQs, 'areas:', Object.keys(areas));
@@ -3107,10 +3144,12 @@ function renderStudentAreaAnalysis(student) {
     const cSign = classDiff > 0 ? '+' : '';
     const oSign = overallDiff > 0 ? '+' : '';
 
+    const safeName = a.name.length > 16 ? a.name.substring(0, 16) + '…' : a.name;
+    const safeClass = a.name.replace(/\s/g, '').substring(0, 30);
     return `
     <div class="area-gauge-card" style="--ag-color:${accentColor};">
       <div class="area-gauge-header">
-        <span class="area-badge area-${a.name.replace(/\s/g,'')}" style="font-size:12px;padding:4px 12px;">${a.name}</span>
+        <span class="area-badge area-${safeClass}" style="font-size:12px;padding:4px 12px;" title="${a.name}">${safeName}</span>
       </div>
       <div class="area-gauge-svg">
         <svg width="160" height="160" viewBox="0 0 160 160">
@@ -3184,7 +3223,8 @@ function renderStudentAreaAnalysis(student) {
   document.getElementById('saStandardList').innerHTML = stdList.map(s => {
     const color = s.rate >= 70 ? '#276749' : s.rate >= 50 ? '#975a16' : '#c53030';
     const bg = s.rate >= 70 ? '#f0fff4' : s.rate >= 50 ? '#fffaf0' : '#fff5f5';
-    const truncText = s.text.length > 40 ? s.text.substring(0, 40) + '...' : s.text;
+    const cleanText = cleanNoise(s.text);
+    const truncText = cleanText.length > 40 ? cleanText.substring(0, 40) + '...' : cleanText;
     return `<div style="padding:8px 10px;border-left:3px solid ${color};background:${bg};margin-bottom:4px;border-radius:4px;">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <span class="std-chip">${s.code}</span>
