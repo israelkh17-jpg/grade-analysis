@@ -1777,11 +1777,31 @@ async function generateDashboard() {
 }
 
 function goBack() {
+  // 사용자 확인 — 등록된 자료가 있으면 초기화 의사 묻기
+  const hasData = (uploadedFiles && uploadedFiles.size > 0)
+    || !!window.DATA
+    || !!TEST_PAPER_PDF
+    || (ITEM_INFO && ITEM_INFO.length > 0);
+  if (hasData) {
+    const ok = confirm('현재 등록된 자료(정오표·출제원안지·문항정보·AI 분석 결과)가 모두 초기화됩니다.\n계속하시겠습니까?');
+    if (!ok) return;
+  }
+
+  // 화면 전환
   document.getElementById('dashboardScreen').style.display = 'none';
   document.getElementById('uploadScreen').style.display = 'flex';
+
+  // 차트 파괴
   destroyCharts();
+
+  // 데이터 상태 초기화
   ITEM_INFO = null;
-  // Reset canvases
+  TEST_PAPER_PDF = null;
+  DATA = null;
+  window.DATA = null;
+  if (uploadedFiles && uploadedFiles.clear) uploadedFiles.clear();
+
+  // 캔버스 재생성 (Chart.js 잔여 상태 제거)
   document.querySelectorAll('#dashboardScreen canvas').forEach(c => {
     const parent = c.parentElement;
     const newCanvas = document.createElement('canvas');
@@ -1789,9 +1809,38 @@ function goBack() {
     newCanvas.height = c.height;
     parent.replaceChild(newCanvas, c);
   });
-  // Reset iteminfo sections
+
+  // 문항정보 섹션·총평 영역 비우기
   document.querySelectorAll('.iteminfo-section').forEach(s => s.classList.remove('activated'));
+  const exam = document.getElementById('examSummary');
+  if (exam) exam.innerHTML = '';
+  const itemInfoBody = document.querySelector('#itemInfoTable tbody');
+  if (itemInfoBody) itemInfoBody.innerHTML = '';
+
+  // 업로드 화면 UI 초기화
+  if (typeof fileList !== 'undefined' && fileList) fileList.innerHTML = '';
+  if (typeof btnGenerate !== 'undefined' && btnGenerate) btnGenerate.style.display = 'none';
+  if (typeof errorMsg !== 'undefined' && errorMsg) {
+    errorMsg.textContent = '';
+    errorMsg.style.display = 'none';
+  }
+  const fInput = document.getElementById('fileInput');
+  if (fInput) fInput.value = '';
+
+  // 모달 안 입력값 비우기
+  const itemFile = document.getElementById('itemInfoFile');
+  if (itemFile) itemFile.value = '';
+  const pdfFile = document.getElementById('itemInfoPdfFile');
+  if (pdfFile) pdfFile.value = '';
+  const tpFile = document.getElementById('testPaperPdfFile');
+  if (tpFile) tpFile.value = '';
+  const itemTextarea = document.getElementById('itemInfoTextarea');
+  if (itemTextarea) itemTextarea.value = '';
+
+  // 버튼 상태 갱신 (배지·AI 활성화)
   if (typeof updateItemInfoButtonState === 'function') updateItemInfoButtonState();
+  if (typeof updateTestPaperButtonState === 'function') updateTestPaperButtonState();
+  if (typeof updateAIAnalyzeButtonState === 'function') updateAIAnalyzeButtonState();
 }
 
 // ============================================================
