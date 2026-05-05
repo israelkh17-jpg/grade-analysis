@@ -2874,19 +2874,18 @@ function renderItemInfoTable() {
     const showArea = area !== prevArea;
     const showCode = code !== prevCode || showArea;
     const areaCell = showArea
-      ? `<td style="background:${areaColor(area)}1a;font-weight:600;color:${areaColor(area)};border-left:3px solid ${areaColor(area)};">${area}</td>`
+      ? `<td style="background:${areaColor(area)}1a;font-weight:600;color:${areaColor(area)};border-left:3px solid ${areaColor(area)};text-align:left;">${area}</td>`
       : `<td style="border-left:3px solid ${areaColor(area)}33;"></td>`;
     const codeCell = showCode
-      ? `<td><span class="std-chip">${code}</span></td>`
+      ? `<td style="text-align:left;"><span class="std-chip">${code}</span></td>`
       : `<td></td>`;
-    const truncText = text.length > 80 ? text.substring(0, 80) + '…' : text;
     prevArea = area;
     prevCode = code;
     return `<tr>
       <td style="text-align:center;font-weight:600;">${it.q}${it.isEssay ? ' <small style="color:#718096;">(서답형)</small>' : ''}</td>
       ${areaCell}
       ${codeCell}
-      <td style="font-size:11px;color:#4a5568;" title="${text}">${truncText}</td>
+      <td style="font-size:11px;color:#4a5568;text-align:left;line-height:1.5;white-space:normal;word-break:keep-all;">${text}</td>
       <td style="text-align:center;"><span class="diff-badge diff-${it.level || '보통'}">${it.level || '-'}</span></td>
       <td style="text-align:center;">${it.point || '-'}</td>
       <td style="text-align:center;">${(it.answer || '-').toString().slice(0, 12)}</td>
