@@ -3008,7 +3008,7 @@ function renderExamSummary() {
     }
 
     // ④ 의도-실제 차이 큰 문항
-    const expectedRate = { '쉬움': 80, '보통': 65, '어려움': 35 };
+    const expectedRate = { '쉬움': 85, '보통': 55, '어려움': 20 };
     const gaps = [];
     for (const info of ITEM_INFO) {
       const it = items.find(i => i.q === info.q);
@@ -3154,7 +3154,7 @@ function renderDifficultyValidation() {
   // 의도 난이도별 그룹
   const groups = { 쉬움: [], 보통: [], 어려움: [] };
   // 매핑: 쉬움=70%이상, 보통=50-69%, 어려움=50%미만 기준
-  const expectedRange = { 쉬움: [70, 100], 보통: [50, 70], 어려움: [0, 50] };
+  const expectedRange = { 쉬움: [70, 100], 보통: [40, 70], 어려움: [0, 40] };
 
   const scatterData = [];
   const deviations = [];
