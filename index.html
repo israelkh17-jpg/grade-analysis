@@ -3371,14 +3371,13 @@ function renderStudentAreaAnalysis(student) {
     const color = s.rate >= 70 ? '#276749' : s.rate >= 50 ? '#975a16' : '#c53030';
     const bg = s.rate >= 70 ? '#f0fff4' : s.rate >= 50 ? '#fffaf0' : '#fff5f5';
     const cleanText = cleanNoise(s.text);
-    const truncText = cleanText.length > 40 ? cleanText.substring(0, 40) + '...' : cleanText;
-    return `<div style="padding:8px 10px;border-left:3px solid ${color};background:${bg};margin-bottom:4px;border-radius:4px;">
+    return `<div style="padding:10px 12px;border-left:3px solid ${color};background:${bg};margin-bottom:6px;border-radius:4px;">
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <span class="std-chip">${s.code}</span>
         <b style="color:${color};">${s.correct}/${s.total} (${s.rate}%)</b>
       </div>
-      <div style="font-size:11px;color:#4a5568;margin-top:3px;">${truncText}</div>
-      <div style="font-size:10px;color:#a0aec0;margin-top:2px;">문항: ${s.qs.join(', ')}</div>
+      <div style="font-size:12px;color:#4a5568;margin-top:5px;text-align:left;line-height:1.55;word-break:keep-all;">${cleanText}</div>
+      <div style="font-size:10px;color:#a0aec0;margin-top:3px;">문항: ${s.qs.join(', ')}</div>
     </div>`;
   }).join('');
 }
