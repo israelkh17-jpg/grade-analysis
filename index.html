@@ -211,6 +211,12 @@ tr:hover{background:#f7fafc;}
 .correct-chip{display:inline-block;background:#c6f6d5;color:#276749;padding:1px 6px;border-radius:4px;margin:1px;font-size:10px;font-weight:600;}
 .scroll-table{max-height:500px;overflow-y:auto;}
 
+.boxplot-legend{display:flex;flex-wrap:wrap;gap:12px 20px;font-size:12px;color:#4a5568;margin-bottom:6px;padding:10px 14px;background:#f7fafc;border-radius:6px;border-left:3px solid #2d6a9f;}
+.boxplot-legend .bpl-item{display:inline-flex;align-items:center;gap:6px;}
+.boxplot-legend .bpl-line{display:inline-block;width:24px;height:2px;background:#a0aec0;}
+.boxplot-legend .bpl-box{display:inline-block;width:24px;height:14px;border:2px solid #2d6a9f;background:rgba(45,106,159,0.15);border-radius:3px;}
+.boxplot-legend .bpl-median{display:inline-block;width:3px;height:16px;background:#e53e3e;}
+.bpl-tip{font-size:11px;color:#718096;margin:6px 0 12px;padding-left:6px;}
 .boxplot-row{display:flex;align-items:center;margin:6px 0;}
 .boxplot-label{width:40px;font-size:12px;font-weight:600;text-align:right;padding-right:10px;color:#4a5568;}
 .boxplot-area{flex:1;height:28px;position:relative;}
@@ -760,7 +766,16 @@ tr:hover{background:#f7fafc;}
 
     <div class="panel" id="panel-classCompare">
       <div class="card"><h3>반별 통계 요약</h3><div class="table-wrap"><table id="classTable"><thead><tr><th>반</th><th>인원</th><th>평균</th><th>중앙값</th><th>표준편차</th><th>최고점</th><th>최저점</th><th>Q1</th><th>Q3</th><th>선택형 평균</th><th>서답형 평균</th></tr></thead><tbody></tbody></table></div></div>
-      <div class="card"><h3>반별 점수 분포 (Box Plot 스타일)</h3><div id="boxplotArea"></div></div>
+      <div class="card">
+        <h3>반별 점수 분포 (Box Plot 스타일)</h3>
+        <div class="boxplot-legend">
+          <span class="bpl-item"><span class="bpl-line"></span> 가로 회색선: <b>최소~최대 점수</b></span>
+          <span class="bpl-item"><span class="bpl-box"></span> 파란 박스: <b>중간 50% 학생</b> (Q1~Q3, 25%~75% 구간)</span>
+          <span class="bpl-item"><span class="bpl-median"></span> 빨간 세로선: <b>중앙값</b> (정확히 가운데 학생의 점수)</span>
+        </div>
+        <p class="bpl-tip">📌 박스가 <b>좁고 짧으면</b> 학생들 점수가 비슷, <b>넓고 길면</b> 격차가 큼.</p>
+        <div id="boxplotArea"></div>
+      </div>
       <div class="card"><h3>반별 점수 구간 분포</h3><div class="chart-container"><canvas id="chartClassDist" height="280"></canvas></div></div>
     </div>
 
