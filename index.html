@@ -1527,10 +1527,28 @@ function updateDistChart() {
   });
 
   if(chartInstances.distPie) chartInstances.distPie.destroy();
-  const pieData = [d[9], d[7]+d[8], d[5]+d[6], d[0]+d[1]+d[2]+d[3]+d[4]];
+  // 10점 단위 (90+부터 0-9까지 내림차순) — 초록→노랑→빨강 그라디언트
+  const pieLabels = ['90점 이상','80~89점','70~79점','60~69점','50~59점','40~49점','30~39점','20~29점','10~19점','0~9점'];
+  const pieData = [d[9],d[8],d[7],d[6],d[5],d[4],d[3],d[2],d[1],d[0]];
+  const pieColors = [
+    '#276749', '#38a169', '#48bb78', '#68d391', // 90+ 60대 초록 계열
+    '#d69e2e', '#ecc94b',                        // 50/40대 노랑 계열
+    '#ed8936', '#e53e3e', '#c53030', '#742a2a'  // 30대 이하 빨강 계열
+  ];
   chartInstances.distPie = new Chart(document.getElementById('chartDistPie'), {
-    type:'doughnut', data:{labels:['90점 이상','70~89점','50~69점','50점 미만'],datasets:[{data:pieData,backgroundColor:['#38a169','#2d6a9f','#d69e2e','#e53e3e']}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{font:{size:12}}}}}
+    type:'doughnut',
+    data:{labels:pieLabels, datasets:[{data:pieData, backgroundColor:pieColors, borderWidth:1}]},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{position:'right', labels:{font:{size:11}, boxWidth:14, padding:6}},
+        tooltip:{callbacks:{label: ctx => {
+          const total = ctx.dataset.data.reduce((a,b)=>a+b,0) || 1;
+          const pct = (ctx.parsed / total * 100).toFixed(1);
+          return `${ctx.label}: ${ctx.parsed}명 (${pct}%)`;
+        }}}
+      }
+    }
   });
 }
 
