@@ -352,6 +352,28 @@ tr:hover{background:#f7fafc;}
 .btn-modal-secondary{background:#e2e8f0;color:#4a5568;}
 .btn-modal-secondary:hover{background:#cbd5e0;}
 
+/* 성취평가 결과분석 */
+.ach-dist-card{display:flex;flex-direction:column;}
+.ach-dist-card .chart-container{flex:1;min-height:0;}
+.ach-classbar-container{height:480px;}
+.ach-cutoff-card{background:linear-gradient(145deg,#f8fafc,#eef2f7);}
+.ach-help{font-size:12px;color:#718096;margin-bottom:12px;line-height:1.5;}
+.ach-cutoff-grid{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-end;}
+.ach-cut{display:flex;flex-direction:column;gap:5px;}
+.ach-cut label{font-size:12px;font-weight:700;color:#1e3a5f;}
+.ach-cut input{width:84px;padding:8px 10px;border:1px solid #cbd5e0;border-radius:8px;font-size:14px;text-align:center;font-family:inherit;}
+.btn-apply-cut{padding:0 22px;height:38px;background:#1e3a5f;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;transition:background 0.2s;}
+.btn-apply-cut:hover{background:#2d5a8a;}
+.ach-warn{margin-top:12px;padding:10px 14px;background:#fff5f5;border:1px solid #feb2b2;border-radius:8px;color:#c53030;font-size:12px;line-height:1.5;}
+.ach-lv-badge{display:inline-block;min-width:28px;text-align:center;padding:3px 9px;border-radius:12px;font-size:12px;font-weight:800;color:#fff;}
+table.ach-table{width:100%;border-collapse:collapse;font-size:12px;}
+table.ach-table th,table.ach-table td{border:1px solid #e2e8f0;padding:8px 10px;text-align:center;}
+table.ach-table thead th{background:#1e3a5f;color:#fff;font-weight:600;}
+table.ach-table tbody tr:nth-child(even){background:#f7fafc;}
+.ach-std-row{display:grid;grid-template-columns:130px 1fr 70px;gap:10px;padding:10px 12px;border-bottom:1px solid #edf2f7;font-size:12px;align-items:start;}
+.ach-std-row:hover{background:#f7fafc;}
+.ach-std-row .std-rate{text-align:right;font-weight:700;}
+
 /* 문항정보 활성화 시 표시 영역 */
 .iteminfo-section{display:none;}
 .iteminfo-section.activated{display:block;}
@@ -743,6 +765,7 @@ tr:hover{background:#f7fafc;}
       <button class="tab-btn" data-tab="scoreDist" onclick="showTab('scoreDist',this)">점수 분포</button>
       <button class="tab-btn" data-tab="studentList" onclick="showTab('studentList',this)">학생 성적표</button>
       <button class="tab-btn" data-tab="studentAnalysis" onclick="showTab('studentAnalysis',this)">학생분석</button>
+      <button class="tab-btn" data-tab="achievement" onclick="showTab('achievement',this)">성취평가 결과분석</button>
     </div>
 
     <!-- 문항분석 총평 (자동 생성) -->
@@ -932,6 +955,55 @@ tr:hover{background:#f7fafc;}
               <tbody id="saDetailTableBody"></tbody>
             </table>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" id="panel-achievement">
+      <div class="card ach-cutoff-card">
+        <h3>📐 성취수준 분할점수 설정</h3>
+        <p class="ach-help">학생의 <b>반올림한 정수 원점수(100점 만점)</b>를 기준으로 성취수준 A~E·미도달을 배정합니다. 분할점수를 바꾼 뒤 <b>적용</b>을 누르면 즉시 다시 계산됩니다.</p>
+        <div class="ach-cutoff-grid">
+          <div class="ach-cut"><label>A / B</label><input type="number" id="cutAB" value="90" min="0" max="100"></div>
+          <div class="ach-cut"><label>B / C</label><input type="number" id="cutBC" value="80" min="0" max="100"></div>
+          <div class="ach-cut"><label>C / D</label><input type="number" id="cutCD" value="70" min="0" max="100"></div>
+          <div class="ach-cut"><label>D / E</label><input type="number" id="cutDE" value="60" min="0" max="100"></div>
+          <div class="ach-cut"><label>E / 미도달</label><input type="number" id="cutEF" value="40" min="0" max="100"></div>
+          <button class="btn-apply-cut" onclick="renderAchievement()">적용</button>
+        </div>
+        <div id="achCutWarn" class="ach-warn" style="display:none;"></div>
+      </div>
+
+      <div class="kpi-row" id="achKpiRow"></div>
+
+      <div class="grid-2">
+        <div class="card ach-dist-card"><h3>성취수준별 분포</h3><div class="chart-container"><canvas id="achChartBar"></canvas></div></div>
+        <div class="card"><h3>성취수준별 인원·비율</h3><div id="achDistTable"></div></div>
+      </div>
+
+      <div class="card">
+        <h3>반별 성취수준 분포</h3>
+        <p class="ach-help">각 반 학생들이 어떤 성취수준에 분포하는지 비율(%)로 보여줍니다.</p>
+        <div class="chart-container ach-classbar-container"><canvas id="achChartClass"></canvas></div>
+        <div class="table-wrap" id="achClassTable" style="margin-top:14px;"></div>
+      </div>
+
+      <div class="card">
+        <h3>성취수준별 학습 특성</h3>
+        <p class="ach-help">각 성취수준 집단의 평균 원점수와 평균 문항 정답률입니다.</p>
+        <div class="table-wrap" id="achLevelStatTable"></div>
+      </div>
+
+      <div class="iteminfo-section" id="achAreaSection">
+        <div class="card">
+          <h3>📚 내용영역 × 성취수준 평균 정답률</h3>
+          <p class="ach-help">성취수준 집단별로 각 내용영역의 평균 정답률입니다. 상위·하위 수준이 특히 갈리는 영역을 확인할 수 있습니다. <small>(문항정보 등록 시 표시)</small></p>
+          <div class="table-wrap" id="achAreaTable"></div>
+        </div>
+        <div class="card">
+          <h3>📋 성취기준별 도달도</h3>
+          <p class="ach-help">같은 성취기준을 다루는 문항들의 전체 평균 정답률입니다. (낮은 도달도 우선)</p>
+          <div id="achStandardList"></div>
         </div>
       </div>
     </div>
@@ -1342,6 +1414,186 @@ function destroyCharts() {
 
 const COLORS = ['#2d6a9f','#38a169','#d69e2e','#e53e3e','#805ad5','#dd6b20','#319795','#d53f8c','#718096'];
 
+// ============================================================
+// 성취평가 결과분석 (성취수준 분할점수 기반)
+// ============================================================
+const ACH_LEVELS = ['A','B','C','D','E','미도달'];
+const ACH_COLORS = {'A':'#1d4ed8','B':'#0891b2','C':'#16a34a','D':'#ca8a04','E':'#ea580c','미도달':'#b91c1c'};
+
+function getAchCutoffs() {
+  const v = id => parseFloat(document.getElementById(id).value);
+  return { AB:v('cutAB'), BC:v('cutBC'), CD:v('cutCD'), DE:v('cutDE'), EF:v('cutEF') };
+}
+
+function classifyAch(score, c) {
+  const s = Math.round(score); // 반올림한 정수 원점수 기준
+  if (s >= c.AB) return 'A';
+  if (s >= c.BC) return 'B';
+  if (s >= c.CD) return 'C';
+  if (s >= c.DE) return 'D';
+  if (s >= c.EF) return 'E';
+  return '미도달';
+}
+
+function achRateCell(r) {
+  if (r == null) return '-';
+  const color = r >= 70 ? '#276749' : r >= 50 ? '#975a16' : '#c53030';
+  return `<span style="color:${color};font-weight:700;">${r}%</span>`;
+}
+
+function renderAchievement() {
+  if (!DATA || !DATA.students) return;
+  const c = getAchCutoffs();
+
+  // 분할점수 유효성 검사
+  const warnEl = document.getElementById('achCutWarn');
+  const vals = [c.AB, c.BC, c.CD, c.DE, c.EF];
+  const invalid = vals.some(x => isNaN(x) || x < 0 || x > 100) ||
+    !(c.AB > c.BC && c.BC > c.CD && c.CD > c.DE && c.DE > c.EF);
+  if (invalid) {
+    warnEl.style.display = 'block';
+    warnEl.innerHTML = '⚠️ 분할점수는 0~100 사이여야 하며, <b>A/B &gt; B/C &gt; C/D &gt; D/E &gt; E/미도달</b> 순으로 점점 작아져야 합니다. 값을 확인해 주세요.';
+  } else {
+    warnEl.style.display = 'none';
+  }
+
+  const students = DATA.students;
+  students.forEach(s => { s.achLevel = classifyAch(s.total, c); });
+
+  const total = students.length;
+  const pct = n => total ? Math.round(n / total * 1000) / 10 : 0;
+  const counts = {}; ACH_LEVELS.forEach(l => counts[l] = 0);
+  students.forEach(s => counts[s.achLevel]++);
+
+  // KPI
+  const aboveC = counts.A + counts.B + counts.C;
+  const eAndBelow = counts.E + counts['미도달'];
+  const topLevel = ACH_LEVELS.reduce((a, b) => counts[b] > counts[a] ? b : a, 'A');
+  const kpis = [
+    {label:'A 수준', value:counts.A + '명', sub:pct(counts.A) + '%'},
+    {label:'C 이상 (보통 이상)', value:aboveC + '명', sub:pct(aboveC) + '%'},
+    {label:'E 이하', value:eAndBelow + '명', sub:pct(eAndBelow) + '%'},
+    {label:'미도달', value:counts['미도달'] + '명', sub:pct(counts['미도달']) + '%'},
+    {label:'최다 분포', value:topLevel + ' 수준', sub:counts[topLevel] + '명'},
+  ];
+  document.getElementById('achKpiRow').innerHTML = kpis.map(k =>
+    `<div class="kpi-card"><div class="label">${k.label}</div><div class="value">${k.value}</div><div class="sub">${k.sub}</div></div>`
+  ).join('');
+
+  // 분포 테이블 (누적비율 포함)
+  let cum = 0;
+  const distRows = ACH_LEVELS.map(l => { cum += counts[l]; return {l, n:counts[l], p:pct(counts[l]), cp:pct(cum)}; });
+  document.getElementById('achDistTable').innerHTML =
+    `<div class="table-wrap"><table class="ach-table"><thead><tr><th>성취수준</th><th>인원</th><th>비율</th><th>누적비율</th></tr></thead><tbody>` +
+    distRows.map(r => `<tr><td><span class="ach-lv-badge" style="background:${ACH_COLORS[r.l]}">${r.l}</span></td><td>${r.n}명</td><td>${r.p}%</td><td>${r.cp}%</td></tr>`).join('') +
+    `<tr style="font-weight:700;background:#eef2f7;"><td>합계</td><td>${total}명</td><td>100%</td><td></td></tr></tbody></table></div>`;
+
+  // 성취수준별 인원 막대그래프
+  if (chartInstances.achBar) chartInstances.achBar.destroy();
+  chartInstances.achBar = new Chart(document.getElementById('achChartBar'), {
+    type:'bar',
+    data:{ labels:ACH_LEVELS, datasets:[{ label:'인원(명)', data:ACH_LEVELS.map(l => counts[l]),
+      backgroundColor:ACH_LEVELS.map(l => ACH_COLORS[l]), borderRadius:6 }] },
+    options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false},
+      tooltip:{callbacks:{label:ctx => `${ctx.parsed.y}명 (${pct(ctx.parsed.y)}%)`}} },
+      scales:{ y:{beginAtZero:true, ticks:{precision:0}, title:{display:true, text:'인원(명)'}},
+        x:{title:{display:true, text:'성취수준'}} } }
+  });
+
+  // 반별 성취수준 분포
+  const classes = DATA.sortedClasses;
+  const classCounts = {};
+  classes.forEach(cl => { classCounts[cl] = {}; ACH_LEVELS.forEach(l => classCounts[cl][l] = 0); });
+  students.forEach(s => { if (classCounts[s.class]) classCounts[s.class][s.achLevel]++; });
+
+  if (chartInstances.achClass) chartInstances.achClass.destroy();
+  chartInstances.achClass = new Chart(document.getElementById('achChartClass'), {
+    type:'bar',
+    data:{ labels:classes.map(cl => cl + '반'),
+      datasets:ACH_LEVELS.map(l => ({ label:l, backgroundColor:ACH_COLORS[l],
+        data:classes.map(cl => { const n = Object.values(classCounts[cl]).reduce((a, b) => a + b, 0) || 1;
+          return Math.round(classCounts[cl][l] / n * 1000) / 10; }) })) },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ tooltip:{callbacks:{label:ctx => `${ctx.dataset.label}: ${ctx.parsed.y}%`}} },
+      scales:{ x:{stacked:true}, y:{stacked:true, max:100, title:{display:true, text:'비율(%)'}} } }
+  });
+
+  // 반별 테이블
+  document.getElementById('achClassTable').innerHTML =
+    `<table class="ach-table"><thead><tr><th>반</th><th>인원</th>` +
+    ACH_LEVELS.map(l => `<th><span class="ach-lv-badge" style="background:${ACH_COLORS[l]}">${l}</span></th>`).join('') +
+    `</tr></thead><tbody>` +
+    classes.map(cl => {
+      const n = Object.values(classCounts[cl]).reduce((a, b) => a + b, 0);
+      return `<tr><td><b>${cl}반</b></td><td>${n}명</td>` +
+        ACH_LEVELS.map(l => { const cnt = classCounts[cl][l];
+          return `<td>${cnt ? cnt + '명<br><span style="font-size:10px;color:#718096">' + (Math.round(cnt / n * 1000) / 10) + '%</span>' : '-'}</td>`; }).join('') +
+        `</tr>`;
+    }).join('') + `</tbody></table>`;
+
+  // 성취수준별 학습 특성
+  const numQ = DATA.numQuestions;
+  document.getElementById('achLevelStatTable').innerHTML =
+    `<table class="ach-table"><thead><tr><th>성취수준</th><th>인원</th><th>평균 원점수</th><th>평균 문항 정답률</th></tr></thead><tbody>` +
+    ACH_LEVELS.map(l => {
+      const g = students.filter(s => s.achLevel === l);
+      if (!g.length) return `<tr><td><span class="ach-lv-badge" style="background:${ACH_COLORS[l]}">${l}</span></td><td>0명</td><td>-</td><td>-</td></tr>`;
+      const avgScore = round(mean(g.map(s => s.total)));
+      const avgRate = round(mean(g.map(s => s.itemCorrect.reduce((a, b) => a + b, 0) / numQ * 100)));
+      return `<tr><td><span class="ach-lv-badge" style="background:${ACH_COLORS[l]}">${l}</span></td><td>${g.length}명</td><td>${avgScore}점</td><td>${avgRate}%</td></tr>`;
+    }).join('') + `</tbody></table>`;
+
+  renderAchievementArea();
+}
+
+// 내용영역 × 성취수준, 성취기준별 도달도 (문항정보 등록 시)
+function renderAchievementArea() {
+  if (typeof ITEM_INFO === 'undefined' || !ITEM_INFO || !ITEM_INFO.length || !DATA) return;
+  const students = DATA.students;
+  const items = DATA.itemAnalysis;
+  const numQ = DATA.numQuestions;
+
+  // 영역 목록 (등록 순서 유지)
+  const areaSet = [];
+  ITEM_INFO.forEach(info => { const a = cleanNoise(info.area) || '기타'; if (!areaSet.includes(a)) areaSet.push(a); });
+
+  const levelGroups = {}; ACH_LEVELS.forEach(l => levelGroups[l] = students.filter(s => s.achLevel === l));
+
+  function areaRate(group, area) {
+    if (!group.length) return null;
+    const qs = ITEM_INFO.filter(info => (cleanNoise(info.area) || '기타') === area && info.q >= 1 && info.q <= numQ).map(info => info.q);
+    if (!qs.length) return null;
+    let correct = 0, total = 0;
+    group.forEach(s => qs.forEach(q => { total++; if (s.itemCorrect[q - 1] === 1) correct++; }));
+    return total ? Math.round(correct / total * 1000) / 10 : null;
+  }
+
+  document.getElementById('achAreaTable').innerHTML =
+    `<table class="ach-table"><thead><tr><th>내용영역</th>` +
+    ACH_LEVELS.map(l => `<th><span class="ach-lv-badge" style="background:${ACH_COLORS[l]}">${l}</span></th>`).join('') +
+    `<th>전체</th></tr></thead><tbody>` +
+    areaSet.map(area => {
+      const overall = areaRate(students, area);
+      return `<tr><td style="text-align:left;"><b>${area}</b></td>` +
+        ACH_LEVELS.map(l => `<td>${achRateCell(areaRate(levelGroups[l], area))}</td>`).join('') +
+        `<td>${overall == null ? '-' : '<b>' + overall + '%</b>'}</td></tr>`;
+    }).join('') + `</tbody></table>`;
+
+  // 성취기준별 도달도 (전체, 낮은 도달도 우선)
+  const standards = {};
+  ITEM_INFO.forEach(info => {
+    const item = items.find(i => i.q === info.q); if (!item) return;
+    const code = info.standardCode || '미분류';
+    if (!standards[code]) standards[code] = {code, text:cleanNoise(info.standardText), total:0, count:0, qs:[]};
+    standards[code].total += item.correct_rate; standards[code].count++; standards[code].qs.push(item.q);
+  });
+  const stdList = Object.values(standards).map(s => ({...s, avg:Math.round(s.total / s.count * 10) / 10})).sort((a, b) => a.avg - b.avg);
+  document.getElementById('achStandardList').innerHTML = stdList.map(s => {
+    const color = s.avg >= 70 ? '#276749' : s.avg >= 50 ? '#975a16' : '#c53030';
+    return `<div class="ach-std-row"><span><span class="std-chip">${s.code}</span><br><small style="color:#a0aec0;">문항: ${s.qs.join(', ')}</small></span><span style="font-size:12px;color:#4a5568;text-align:left;line-height:1.55;word-break:keep-all;">${s.text || ''}</span><span class="std-rate" style="color:${color};">${s.avg}%</span></div>`;
+  }).join('');
+}
+
 function showTab(id, el) {
   document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -1384,6 +1636,7 @@ function renderDashboard(data, examInfo, subjectName) {
   renderScoreDist();
   renderStudentList();
   renderStudentAnalysis();
+  renderAchievement();
   renderExamSummary();
 
   // Reset to overview tab
@@ -2923,6 +3176,7 @@ function activateItemInfoSections() {
   renderAreaOverview();
   renderDifficultyValidation();
   renderStandardAnalysis();
+  if (typeof renderAchievementArea === 'function') renderAchievementArea();
   // 학생분석이 이미 표시 중이면 갱신
   const sel = document.getElementById('saStudentSelect');
   if (sel && sel.value) selectStudentForAnalysis();
