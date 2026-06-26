@@ -803,7 +803,6 @@ table.ach-table tbody tr:nth-child(even){background:#f7fafc;}
     </div>
 
     <div class="panel" id="panel-itemAnalysis">
-      <div class="card"><h3>문항별 정답률</h3><div id="itemBars"></div></div>
       <div class="grid-2">
         <div class="card"><h3>문항별 정답률 차트</h3><div class="chart-container"><canvas id="chartItemRate" height="300"></canvas></div></div>
         <div class="card"><h3>문항 상세 분석</h3><div class="filter-row"><label>문항 선택:</label><select id="itemSelect" onchange="showItemDetail()"></select></div><div id="itemDetailArea"></div><div class="chart-container" style="margin-top:12px"><canvas id="chartItemWrong" height="200"></canvas></div></div>
@@ -836,25 +835,6 @@ table.ach-table tbody tr:nth-child(even){background:#f7fafc;}
           <div id="standardAnalysisList"></div>
         </div>
 
-        <!-- 등록된 문항정보 검증 표 — 모든 영역별 분석의 원본 데이터 -->
-        <div class="card">
-          <h3>🗂️ 등록된 문항정보 (내용영역·성취기준 매핑)</h3>
-          <p style="font-size:12px;color:#718096;margin-bottom:10px;">
-            업로드한 문항정보표에서 추출한 원본 데이터입니다. 이 표가 기준이 되어 위쪽 모든 분석(영역별·성취기준별·총평·학생분석)에 그대로 사용됩니다. 반드시 문항정보표를 <b>xls data 형식</b>으로 등록해 주셔야 합니다.
-          </p>
-          <div class="table-wrap"><table id="itemInfoTable" style="font-size:12px;">
-            <thead><tr>
-              <th style="width:60px;">문항</th>
-              <th style="width:160px;">내용영역</th>
-              <th style="width:130px;">성취기준 코드</th>
-              <th>성취기준 본문</th>
-              <th style="width:70px;">난이도</th>
-              <th style="width:60px;">배점</th>
-              <th style="width:60px;">정답</th>
-            </tr></thead>
-            <tbody></tbody>
-          </table></div>
-        </div>
       </div>
     </div>
 
@@ -1699,11 +1679,6 @@ function renderClassCompare() {
 
 function renderItemAnalysis() {
   const items = DATA.itemAnalysis;
-  document.getElementById('itemBars').innerHTML = items.map(item => {
-    const rate = item.correct_rate;
-    const colorClass = rate >= 70 ? 'rate-high' : rate >= 50 ? 'rate-mid' : 'rate-low';
-    return `<div class="item-bar"><div class="q-label">${item.q}번</div><div class="bar-bg"><div class="bar-fill ${colorClass}" style="width:${rate}%">${rate}%</div></div><div class="point-label">${item.point > 0 ? item.point+'점' : '무배점'}</div></div>`;
-  }).join('');
 
   chartInstances.itemRate = new Chart(document.getElementById('chartItemRate'), {
     type:'bar', data:{labels:items.map(i=>i.q+'번'),
