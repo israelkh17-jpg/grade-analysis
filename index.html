@@ -1492,11 +1492,11 @@ function renderAchievement() {
   if (chartInstances.achBar) chartInstances.achBar.destroy();
   chartInstances.achBar = new Chart(document.getElementById('achChartBar'), {
     type:'bar',
-    data:{ labels:ACH_LEVELS, datasets:[{ label:'인원(명)', data:ACH_LEVELS.map(l => counts[l]),
+    data:{ labels:ACH_LEVELS, datasets:[{ label:'비율(%)', data:ACH_LEVELS.map(l => pct(counts[l])),
       backgroundColor:ACH_LEVELS.map(l => ACH_COLORS[l]), borderRadius:6 }] },
     options:{ responsive:true, maintainAspectRatio:false, plugins:{ legend:{display:false},
-      tooltip:{callbacks:{label:ctx => `${ctx.parsed.y}명 (${pct(ctx.parsed.y)}%)`}} },
-      scales:{ y:{beginAtZero:true, ticks:{precision:0}, title:{display:true, text:'인원(명)'}},
+      tooltip:{callbacks:{label:ctx => `${ctx.parsed.y}% (${counts[ACH_LEVELS[ctx.dataIndex]]}명)`}} },
+      scales:{ y:{beginAtZero:true, max:100, ticks:{callback:v => v + '%'}, title:{display:true, text:'비율(%)'}},
         x:{title:{display:true, text:'성취수준'}} } }
   });
 
