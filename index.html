@@ -3625,9 +3625,11 @@ function renderDifficultyValidation() {
       },
       scales:{
         x:{
+          type:'linear',
           title:{display:true,text:'출제 의도 난이도'},
           min:0.5,max:3.5,
-          ticks:{stepSize:1, callback:v => ({1:'쉬움',2:'보통',3:'어려움'}[v]||'')}
+          afterBuildTicks: axis => { axis.ticks = [{value:1},{value:2},{value:3}]; },
+          ticks:{stepSize:1, autoSkip:false, callback:v => ({1:'쉬움',2:'보통',3:'어려움'}[v]||'')}
         },
         y:{title:{display:true,text:'실제 정답률(%)'},min:0,max:100}
       }
