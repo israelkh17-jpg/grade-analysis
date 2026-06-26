@@ -548,12 +548,12 @@ table.ach-table tbody tr:nth-child(even){background:#f7fafc;}
         <input type="file" id="itemInfoFile" accept=".xlsx,.xls" style="margin-bottom:10px;">
         <div style="background:#f7fafc;border-left:3px solid #2d6a9f;padding:10px 12px;border-radius:6px;font-size:12px;color:#4a5568;line-height:1.7;">
           <b style="color:#1e3a5f;">📋 지원하는 양식 (NEIS 표준)</b><br>
-          • <b>10행부터</b> 문항 데이터 시작 (1~9행은 헤더 영역)<br>
-          • <b>A열</b>: 문항번호 · <b>B열</b>: 내용영역 · <b>C열</b>: 성취기준(코드+본문)<br>
-          • <b>D/E/F열</b>: 난이도 (어려움/보통/쉬움 — ○ 표시 컬럼)<br>
-          • <b>G열</b>: 배점 · <b>H열</b>: 정답 (서답형은 "별지 참조")<br>
+          • <b>헤더 행 자동 인식</b> — "문항번호/내용영역/난이도" 등이 있는 행을 찾아 그 아래부터 읽습니다<br>
+          • 필수 열: <b>문항번호 · 내용영역 · 성취기준(코드+본문) · 난이도 · 배점 · 정답</b><br>
+          • <b>난이도</b>: "보통/쉬움/어려움" 텍스트 열, 또는 어려움·보통·쉬움 ○ 표시 분리 열 — 둘 다 인식<br>
+          • <b>정답</b>은 서답형의 경우 "별지 참조"<br>
           • <b>"서답형 문항"</b> 행이 나오면 그 아래는 자동으로 서답형으로 처리<br>
-          • A열이 비어 있는 행(페이지 분리 등)은 자동으로 무시
+          • 문항번호가 비어 있는 행(페이지 분리 등)은 자동으로 무시
         </div>
         <!-- PDF·텍스트 업로드는 호환성 위해 hidden 유지 -->
         <input type="file" id="itemInfoPdfFile" accept=".pdf" style="display:none;">
@@ -2872,65 +2872,90 @@ async function parseItemInfoFile(file) {
   });
 }
 
-// 엑셀 문항정보표 파서 — NEIS 양식 기준
-// 구조 (10행부터 시작):
-//   A열: 문항번호 (숫자) | B열: 내용영역 | C열: 성취기준(코드 [..] + 본문)
-//   D열: 어려움(○) | E열: 보통(○) | F열: 쉬움(○)
-//   G열: 배점 | H열: 정답
+// 엑셀 문항정보표 파서 — 헤더 기반(NEIS 양식의 열 위치 차이를 자동 인식)
+// 지원 형식 두 가지:
+//   (A) 난이도 단일 텍스트 열: … | 난이도(보통/쉬움/어려움) | 배점 | 정답
+//   (B) 난이도 분리 ○ 열:      … | 어려움(○) | 보통(○) | 쉬움(○) | 배점 | 정답
 // 규칙:
-//   - 데이터 행은 row index 9(=10행) 부터 시작
-//   - A열이 비어 있는 행은 무시 (페이지 분리 등 잡음)
-//   - A열에 "서답형 문항"이 나오면 그 다음 행부터는 서답형 모드
-//   - 서답형의 문항번호는 선택형 마지막 q + 해당 서답형 번호로 변환
+//   - 헤더 행(문항번호/내용영역/난이도 등 포함)을 찾아 그 다음 행부터 데이터로 읽음
+//   - "서답형 문항" 행을 만나면 이후는 서답형 모드(번호를 선택형 마지막 q에 이어 붙임)
 function parseItemInfoExcelRows(rows) {
+  const norm = (v) => String(v ?? '').replace(/\s/g, '');
+
+  // 1) 헤더 행 탐색
+  let headerRow = -1;
+  for (let r = 0; r < Math.min(rows.length, 20); r++) {
+    const joined = (rows[r] || []).map(norm).join('|');
+    if (/문항(번호)?/.test(joined) &&
+        (/내용영역|영역/.test(joined) || /난이도/.test(joined) || /성취기준/.test(joined))) {
+      headerRow = r; break;
+    }
+  }
+
+  // 2) 열 인덱스 매핑
+  const header = (headerRow >= 0 ? rows[headerRow] : []).map(norm);
+  const findCol = (...keys) => {
+    for (let i = 0; i < header.length; i++) {
+      if (keys.some(k => header[i].includes(k))) return i;
+    }
+    return -1;
+  };
+  let cNum = findCol('문항번호', '문항');
+  let cArea = findCol('내용영역', '영역');
+  let cStd = findCol('성취기준', '성취');
+  const cLevel = findCol('난이도');
+  let cPoint = findCol('배점', '점수');
+  let cAns = findCol('정답');
+  const cHard = findCol('어려움'), cMid = findCol('보통'), cEasy = findCol('쉬움');
+  const splitDifficulty = (cHard >= 0 && cEasy >= 0); // 분리형(○) 여부
+
+  // 헤더를 못 찾으면 기존 NEIS 가정으로 폴백 (A/B/C + D/E/F(○) + G/H)
+  if (headerRow < 0) { cNum = 0; cArea = 1; cStd = 2; cPoint = 6; cAns = 7; }
+  const startRow = headerRow >= 0 ? headerRow + 1 : 9;
+
   const items = [];
   let serdapMode = false;
   let lastSelectiveQ = 0;
-  const startRow = 9; // 10행(0-based 9)
 
   for (let r = startRow; r < rows.length; r++) {
     const row = rows[r] || [];
-    const A = String(row[0] ?? '').trim();
-    const B = String(row[1] ?? '').trim();
-    const C = String(row[2] ?? '').trim();
-    const D = String(row[3] ?? '').trim();
-    const E = String(row[4] ?? '').trim();
-    const F = String(row[5] ?? '').trim();
-    const G = row[6];
-    const H = String(row[7] ?? '').trim();
+    const get = (i) => i >= 0 ? String(row[i] ?? '').trim() : '';
 
-    // 서답형 모드 전환
-    if (/서답형\s*문항/.test(A) || /서답형\s*문항/.test(B) || /서답형\s*문항/.test(C)) {
+    // 서답형 모드 전환 (행 어디든 "서답형 문항")
+    if (/서답형\s*문항/.test(row.map(c => String(c ?? '')).join(' '))) {
       serdapMode = true;
       lastSelectiveQ = items.length > 0 ? Math.max(...items.map(i => i.q)) : 0;
       continue;
     }
 
-    // A열이 비었거나 숫자가 아니면 스킵 (페이지 분리·총합계 등)
+    const A = cNum >= 0 ? get(cNum) : get(0);
     if (!A) continue;
     const qNum = parseInt(A.replace(/[^\d]/g, ''));
     if (isNaN(qNum) || qNum < 1 || qNum > 200) continue;
 
-    // 내용영역
-    const area = B || '미분류';
+    const area = (cArea >= 0 ? get(cArea) : get(1)) || '미분류';
 
-    // 성취기준: [코드]본문 분리
+    const C = cStd >= 0 ? get(cStd) : get(2);
     const codeMatch = C.match(/\[([^\]]+)\]/);
     const standardCode = codeMatch ? codeMatch[1] : '';
     const standardText = codeMatch ? C.replace(codeMatch[0], '').trim() : C;
 
-    // 난이도: D/E/F 중 ○ 또는 비공란이 있는 컬럼
-    const isMark = (v) => v && /[○Oo◯●]/.test(v);
+    // 난이도
     let level = '보통';
-    if (isMark(D)) level = '어려움';
-    else if (isMark(E)) level = '보통';
-    else if (isMark(F)) level = '쉬움';
+    if (splitDifficulty) {
+      const isMark = (v) => v && /[○Oo◯●vV✓√]/.test(v);
+      if (isMark(get(cHard))) level = '어려움';
+      else if (cMid >= 0 && isMark(get(cMid))) level = '보통';
+      else if (isMark(get(cEasy))) level = '쉬움';
+    } else if (cLevel >= 0) {
+      const t = norm(get(cLevel));
+      if (/어려움|어렵|상/.test(t)) level = '어려움';
+      else if (/쉬움|쉽|하/.test(t)) level = '쉬움';
+      else if (/보통|중/.test(t)) level = '보통';
+    }
 
-    // 배점
-    const point = parseFloat(G) || 0;
-
-    // 정답 — "별지 참조" 또는 숫자
-    const answer = H || '';
+    const point = cPoint >= 0 ? (parseFloat(get(cPoint)) || 0) : (parseFloat(row[6]) || 0);
+    const answer = cAns >= 0 ? get(cAns) : get(7);
 
     const adjQ = serdapMode ? qNum + lastSelectiveQ : qNum;
 
