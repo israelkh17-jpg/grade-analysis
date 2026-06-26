@@ -2869,24 +2869,34 @@ function parseItemInfoExcelRows(rows) {
 
   // 2) 열 인덱스 매핑
   const header = (headerRow >= 0 ? rows[headerRow] : []).map(norm);
-  const findCol = (...keys) => {
-    for (let i = 0; i < header.length; i++) {
-      if (keys.some(k => header[i].includes(k))) return i;
+  const findIn = (arr, ...keys) => {
+    for (let i = 0; i < arr.length; i++) {
+      if (keys.some(k => arr[i].includes(k))) return i;
     }
     return -1;
   };
+  const findCol = (...keys) => findIn(header, ...keys);
   let cNum = findCol('문항번호', '문항');
   let cArea = findCol('내용영역', '영역');
   let cStd = findCol('성취기준', '성취');
   const cLevel = findCol('난이도');
   let cPoint = findCol('배점', '점수');
   let cAns = findCol('정답');
-  const cHard = findCol('어려움'), cMid = findCol('보통'), cEasy = findCol('쉬움');
+  let cHard = findCol('어려움'), cMid = findCol('보통'), cEasy = findCol('쉬움');
+
+  // 난이도 하위 라벨(어려움/보통/쉬움)이 헤더 '다음 행'에 분리된 병합 헤더 형식 처리
+  //   예) 8행에 "난이도"(병합) → 9행에 "어려움/보통/쉬움", 데이터는 10행부터
+  let usedSubHeader = false;
+  if (headerRow >= 0 && cHard < 0 && cEasy < 0) {
+    const sub = (rows[headerRow + 1] || []).map(norm);
+    const sh = findIn(sub, '어려움'), sm = findIn(sub, '보통'), se = findIn(sub, '쉬움');
+    if (sh >= 0 && se >= 0) { cHard = sh; cMid = sm; cEasy = se; usedSubHeader = true; }
+  }
   const splitDifficulty = (cHard >= 0 && cEasy >= 0); // 분리형(○) 여부
 
   // 헤더를 못 찾으면 기존 NEIS 가정으로 폴백 (A/B/C + D/E/F(○) + G/H)
   if (headerRow < 0) { cNum = 0; cArea = 1; cStd = 2; cPoint = 6; cAns = 7; }
-  const startRow = headerRow >= 0 ? headerRow + 1 : 9;
+  const startRow = headerRow >= 0 ? headerRow + (usedSubHeader ? 2 : 1) : 9;
 
   const items = [];
   let serdapMode = false;
@@ -2905,7 +2915,8 @@ function parseItemInfoExcelRows(rows) {
 
     const A = cNum >= 0 ? get(cNum) : get(0);
     if (!A) continue;
-    const qNum = parseInt(A.replace(/[^\d]/g, ''));
+    const qMatch = A.match(/\d+/);          // '1.0' → '1', '10' → '10' (선두 정수)
+    const qNum = qMatch ? parseInt(qMatch[0], 10) : NaN;
     if (isNaN(qNum) || qNum < 1 || qNum > 200) continue;
 
     const area = (cArea >= 0 ? get(cArea) : get(1)) || '미분류';
