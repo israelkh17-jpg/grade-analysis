@@ -1200,6 +1200,40 @@
         display: block !important;
       }
 
+      /* 스크롤 표는 인쇄 시 전체 행을 펼쳐서 출력 */
+      .scroll-table {
+        max-height: none !important;
+        overflow: visible !important;
+      }
+
+      /* ===== 전체 인쇄 모드: 5개 탭을 섹션별로 연속 출력 ===== */
+      body.print-all .panel {
+        display: none !important;
+      }
+
+      body.print-all .panel.print-target {
+        display: block !important;
+        break-before: page;
+        page-break-before: always;
+      }
+
+      body.print-all #panel-overview.print-target {
+        break-before: auto;
+        page-break-before: auto;
+      }
+
+      body.print-all .panel.print-target::before {
+        content: attr(data-print-title);
+        display: block;
+        font-size: 13pt;
+        font-weight: 700;
+        color: #1e3a5f;
+        border-bottom: 2px solid #2d6a9f;
+        padding-bottom: 3px;
+        margin: 0 0 8px;
+        page-break-after: avoid;
+      }
+
       /* 카드/그리드: 카드 단위로 깨지지 않도록 */
       .container {
         padding: 0 !important;
@@ -2392,7 +2426,8 @@
         <button class="btn-back" id="btnAIAnalyze" onclick="openAIAnalysisModal()" disabled
           title="출제원안지·문항정보·학생 성적이 모두 등록되어야 활성화됩니다">🤖 AI 성취수준 분석</button>
         <button class="btn-back" onclick="goBack()">다른 과목 분석</button>
-        <button class="btn-print" onclick="window.print()">인쇄</button>
+        <button class="btn-print" onclick="window.print()" title="현재 보고 있는 탭만 인쇄">인쇄</button>
+        <button class="btn-print" onclick="printAllTabs()" title="전체 개요·반별 비교·문항 분석·점수 분포·학생 성적표를 한꺼번에 인쇄">🖨️ 전체 인쇄</button>
       </div>
     </div>
     <div class="container">
@@ -2410,7 +2445,7 @@
       <!-- 문항분석 총평 (자동 생성) -->
       <div class="exam-summary" id="examSummary"></div>
 
-      <div class="panel active" id="panel-overview">
+      <div class="panel active" id="panel-overview" data-print-title="1. 전체 개요">
         <div class="grid-2">
           <div class="card">
             <h3>점수 구간별 인원 분포</h3>
@@ -2435,7 +2470,7 @@
         </div>
       </div>
 
-      <div class="panel" id="panel-classCompare">
+      <div class="panel" id="panel-classCompare" data-print-title="2. 반별 비교">
         <div class="card">
           <h3>반별 통계 요약</h3>
           <div class="table-wrap">
@@ -2475,7 +2510,7 @@
         </div>
       </div>
 
-      <div class="panel" id="panel-itemAnalysis">
+      <div class="panel" id="panel-itemAnalysis" data-print-title="3. 문항 분석">
         <div class="grid-2">
           <div class="card">
             <h3>문항별 정답률 차트</h3>
@@ -2534,7 +2569,7 @@
         </div>
       </div>
 
-      <div class="panel" id="panel-scoreDist">
+      <div class="panel" id="panel-scoreDist" data-print-title="4. 점수 분포">
         <div class="filter-row"><label>반 선택:</label><select id="distClassFilter" onchange="updateDistChart()">
             <option value="all">전체</option>
           </select></div>
@@ -2555,7 +2590,7 @@
         </div>
       </div>
 
-      <div class="panel" id="panel-studentList">
+      <div class="panel" id="panel-studentList" data-print-title="5. 학생 성적표">
         <div class="filter-row">
           <label>반:</label><select id="studentClassFilter" onchange="filterStudents()">
             <option value="all">전체</option>
@@ -3350,6 +3385,45 @@
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
       document.getElementById('panel-' + id).classList.add('active');
       if (el) el.classList.add('active');
+    }
+
+    // ============================================================
+    // 전체 인쇄: 전체 개요·반별 비교·문항 분석·점수 분포·학생 성적표를 한꺼번에 출력
+    // 숨겨진 탭의 Chart.js 캔버스는 크기 0으로 그려져 있으므로, 인쇄 직전에
+    // 대상 패널을 잠시 화면에 펼쳐 차트를 리사이즈한 뒤 인쇄하고 원상복구한다.
+    // ============================================================
+    const PRINT_ALL_TABS = ['overview', 'classCompare', 'itemAnalysis', 'scoreDist', 'studentList'];
+
+    function printAllTabs() {
+      if (!DATA) {
+        alert('인쇄할 분석 결과가 없습니다. 먼저 성적 파일을 업로드해 주세요.');
+        return;
+      }
+      const panels = PRINT_ALL_TABS.map(id => document.getElementById('panel-' + id)).filter(Boolean);
+
+      // 1) 전체 인쇄 모드 진입 + 대상 패널을 화면에 임시로 펼침
+      document.body.classList.add('print-all');
+      panels.forEach(p => { p.classList.add('print-target'); p.style.display = 'block'; });
+      Object.values(chartInstances).forEach(c => { try { c.resize(); } catch (e) { } });
+
+      // 2) 인쇄 종료(대화상자 닫힘) 후 원상복구
+      let restored = false;
+      const restore = () => {
+        if (restored) return;
+        restored = true;
+        window.removeEventListener('afterprint', restore);
+        document.body.classList.remove('print-all');
+        panels.forEach(p => { p.classList.remove('print-target'); p.style.display = ''; });
+        Object.values(chartInstances).forEach(c => { try { c.resize(); } catch (e) { } });
+      };
+      window.addEventListener('afterprint', restore);
+
+      // 3) 차트 리사이즈가 반영될 시간을 준 뒤 인쇄
+      setTimeout(() => {
+        window.print();
+        // afterprint 미지원 환경 대비 안전장치
+        setTimeout(restore, 1500);
+      }, 350);
     }
 
     function renderDashboard(data, examInfo, subjectName) {
