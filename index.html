@@ -2080,18 +2080,18 @@
       <div class="modal-body">
         <p
           style="font-size:13px;color:#4a5568;margin-bottom:18px;background:#ebf8ff;padding:12px 16px;border-radius:8px;border-left:4px solid #2d6a9f;">
-          <b>💡 안내:</b> NEIS(나이스) 교무업무 시스템에서 "지필평가 교과목별 학생답 정오표"를 반별로 다운로드한 후, 본 도구에 업로드하세요.
+          <b>💡 안내:</b> NEIS(나이스) 교무업무 시스템에서 "정기시험 교과목별 학생답 정오표"를 반별로 다운로드한 후, 본 도구에 업로드하세요.
         </p>
 
         <!-- Step 1 -->
         <div class="guide-step">
           <div class="guide-step-num">1</div>
           <div class="guide-step-content">
-            <h3>지필평가 조회 메뉴 진입</h3>
-            <p>NEIS 좌측 메뉴에서 <b>교과담임</b> 탭을 펼친 후 <b>지필평가 조회/통계 → 지필평가 조회</b>를 클릭합니다.</p>
+            <h3>정기시험 조회 메뉴 진입</h3>
+            <p>NEIS 좌측 메뉴에서 <b>교과담임</b> 탭을 펼친 후 <b>정기시험 조회/통계 → 정기시험 조회</b>를 클릭합니다.</p>
             <div class="guide-img-wrap">
               <canvas id="guideCanvas1" class="guide-canvas"></canvas>
-              <div class="guide-img-caption">📌 좌측 메뉴 트리에서 "지필평가 조회" 진입</div>
+              <div class="guide-img-caption">📌 좌측 메뉴 트리에서 "정기시험 조회" 진입</div>
             </div>
           </div>
         </div>
@@ -2367,7 +2367,7 @@
       1. 과목별 반별 정오표 엑셀 파일(1반~9반)을 드래그&드롭 또는 클릭하여 업로드<br>
       2. 파일이 모두 추가되면 <b>"대시보드 생성"</b> 버튼 클릭<br>
       3. 자동으로 성적 분석 대시보드가 생성됩니다<br><br>
-      <b>지원 형식:</b> "지필평가 교과목별 학생답 정오표" 엑셀 파일 (.xlsx)<br>
+      <b>지원 형식:</b> "정기시험 교과목별 학생답 정오표" 엑셀 파일 (.xlsx)<br>
       <b>참고:</b> 모든 처리는 브라우저에서만 이루어지며, 데이터가 외부로 전송되지 않습니다.
     </div>
 
@@ -3995,7 +3995,7 @@
         const tempCtx = tempCanvas.getContext('2d');
         await page.render({ canvasContext: tempCtx, viewport: viewport }).promise;
 
-        // Step 1 - 첫 번째 스크린샷 (NEIS 좌측 메뉴 + 지필평가 조회)
+        // Step 1 - 첫 번째 스크린샷 (NEIS 좌측 메뉴 + 정기시험 조회)
         // PDF 페이지 좌표계: 위쪽(상단) 약 18%~50% 영역에 첫 화면이 있음
         const c1 = document.getElementById('guideCanvas1');
         drawCroppedImage(tempCanvas, c1, 0.04, 0.13, 0.96, 0.36);

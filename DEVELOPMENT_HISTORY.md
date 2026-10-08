@@ -1,4 +1,4 @@
-# 지필고사 성적 분석 프로그램 — 개발 히스토리
+# 정기시험 성적 분석 프로그램 — 개발 히스토리
 
 > Production: https://grade-analysis-lime.vercel.app
 > GitHub: https://github.com/israelkh17-jpg/grade-analysis
@@ -29,7 +29,7 @@
 | `9bc88cf` | AI 분석 구현 | 학생 1명당 영역별 성취수준 진술문 생성 |
 | `6c3f8c3` | 모델 전환 | Gemini → Claude Opus 4.7 (SDK + 프롬프트 캐싱) |
 | `ef8c2fd` | 인증 | X-Admin-Code 헤더 + 1회 입력 프롬프트 |
-| `8b5cf41` | 제목 통일 | "지필고사 성적 분석 프로그램" |
+| `8b5cf41` | 제목 통일 | "정기시험 성적 분석 프로그램" |
 | `4f00762` | UI 배지 | 문항정보 등록 상태를 버튼 배지로 표시 |
 
 ---

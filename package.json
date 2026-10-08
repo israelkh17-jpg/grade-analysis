@@ -2,7 +2,7 @@
   "name": "grade-analysis",
   "version": "1.0.0",
   "private": true,
-  "description": "지필평가 성적 분석 대시보드 + AI 성취수준 진술문 생성",
+  "description": "정기시험 성적 분석 대시보드 + AI 성취수준 진술문 생성",
   "engines": {
     "node": ">=18.x"
   },
